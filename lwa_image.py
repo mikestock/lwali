@@ -211,7 +211,20 @@ if __name__ == '__main__':
     NImage  = settings.imagesize
     ###
     # I've tried a couple of data types, float16 saturates, as does int16
-    output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
+    outputFile = h5py.File( settings.outputpath, mode='w' )
+    outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
+    #store settings information in here
+    outputDset.attrs['samplerate']  = settings.samplerate
+    outputDset.attrs['bandwidth']   = settings.bandwidth
+    outputDset.attrs['startsample'] = settings.startsample
+    outputDset.attrs['stopsample']  = settings.stopsample
+    outputDset.attrs['inttime']     = settings.inttime
+    outputDset.attrs['steptime']    = settings.steptime
+    outputDset.attrs['interpolation'] = settings.interpolation
+    outputDset.attrs['imagesize']   = settings.imagesize
+    outputDset.attrs['bbox']        = settings.bbox
+    outputDset.attrs['whiten']      = settings.whiten
+    # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
     s = NFrames*NImage*NImage*2/1024/1024
     print ('Creating %s, sized %i MB'%(settings.outputpath, s) )
@@ -282,7 +295,7 @@ if __name__ == '__main__':
 
         ###
         # Save to Output
-        output[iFrame] = im
+        outputDset[iFrame] = im
 
         # Some output printing, so that I know something is happening
         print( '  %10i %1.6f %i %0.1f'%(iSample, iSample/settings.samplerate, dMax, im.max()/5))
@@ -291,3 +304,4 @@ if __name__ == '__main__':
         iFrame += 1
         iSample += settings.steptime
 
+    outputFile.close()
