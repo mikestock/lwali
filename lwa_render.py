@@ -4,6 +4,7 @@ from __future__ import print_function
 from __future__ import division
 import matplotlib.pyplot as plt #plotting
 import numpy as np #math
+import h5py
 import  os  #general purpose
 import lwa_image as lwai #config reading
 
@@ -17,12 +18,20 @@ if __name__ == '__main__':
     settings = lwai.read_config()
 
     # how big is the output?
-    NFrames = (settings.stopsample-settings.startsample)//settings.steptime
-    NImage  = settings.imagesize
+
        
     # load the output data
-    print ("Loading output file: %s, shape (%i,%i,%i)"%(settings.outputpath,NFrames,NImage,NImage))
-    frames = np.memmap( settings.outputpath, mode='r',  dtype='float32', shape=(NFrames,NImage,NImage) )
+    # print ("Loading output file: %s, shape (%i,%i,%i)"%(settings.outputpath,NFrames,NImage,NImage))
+    inputFile = h5py.File( settings.outputpath, 'r' )
+    frames = inputFile[ 'dirty' ]
+    print ('loaded file has shape: %s'%repr( frames.shape ) )
+    #override settings we loaded from the config in perfernces for settings stored in the hdf5 file
+    for key in frames.attrs.keys():
+        setattr( settings, key, frames.attrs[key])
+    # frames = np.memmap( settings.outputpath, mode='r',  dtype='float32', shape=(NFrames,NImage,NImage) )
+
+    NFrames = (settings.stopsample-settings.startsample)//settings.steptime
+    NImage  = settings.imagesize
 
     fig = plt.figure( figsize=figsize )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
@@ -98,7 +107,7 @@ if __name__ == '__main__':
             
             # save the frame output?
             if settings.renderer['saveoutput']:
-                outS = 'frames/frame_%06i.png'%i
+                outS = settings.renderer['outputdir'] + 'frame_%06i.png'%i
                 fig.savefig( outS )
             
             # remove the changing stuff
