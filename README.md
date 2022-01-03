@@ -42,6 +42,7 @@ For lightning, we'd like to get these all combined together, and then be able to
 integration times in the periods shorter than 40us.  To do this, we convert the whole thing into a
 time series, 1 antenna at a time.  This is a time consuming process (several hours), but you only 
 have to do it once.  
+python3 tbf_to_timeseries.py <input paths> <output path>
 
 Note, the output hdf5 file will be around 42 GB is size when complete, plan accordingly
 
