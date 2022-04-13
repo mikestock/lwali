@@ -243,6 +243,7 @@ if __name__ == '__main__':
         dMax = 0
         for dset in timeSeriesDsets:
             offset = dset.attrs['integerCableDelay']
+            #TODO - What is this factor of 1000 for?
             sampleGain = dset.attrs['sampleGain']*1000
             d = dset[ iSample+offset:iSample+offset+settings.inttime ]
             # don't forget to apply time weighting
