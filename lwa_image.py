@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 if i == j:
                     continue
                 # get the fft of the j antenna
-                fftj = np.fft.fft( data[j], 2*I )
+                fftj = np.fft.fft( data[j], 2*I )   #TODO, having this in the loop here means I'm calculating the forward FFT more often than I have to
                 # whiten?
                 if settings.whiten:
                     # what is the mean rms amplitude of the current spectra?
