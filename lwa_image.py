@@ -257,35 +257,29 @@ if __name__ == '__main__':
         xcs  = np.zeros( [M*(M-1)//2, I*P*2], dtype='float32' ) #store the xcross correlations in an array
         # loop over antenna pairs
         k = 0   #location in xcs
+
+        ffts = np.zeros( (M,2*I), dtype='complex64' )
         for i in range(M):
-            # get the fft of the i antenna
-            ffti = np.fft.fft( data[i], 2*I )
-            # whiten?
+            fftsi = np.fft.fft( data[i], 2*I )
             if settings.whiten:
                 # what is the mean rms amplitude of the current spectra?
                 p = abs(ffti).sum().real
                 # normalize the FFT (whiten) with some scaling to keep 
                 # the image amplitude about the same
                 ffti = ffti/abs( ffti )*p/len(ffti)
+            ffts[i] = ffti
+            
 
+        for i in range(M):
             for j in range(i+1,M):
                 # edge case that shouldn't come up if loops loop right
                 if i == j:
                     continue
-                # get the fft of the j antenna
-                fftj = np.fft.fft( data[j], 2*I )   #TODO, having this in the loop here means I'm calculating the forward FFT more often than I have to
-                # whiten?
-                if settings.whiten:
-                    # what is the mean rms amplitude of the current spectra?
-                    p = abs(fftj).sum().real
-                    # normalize the FFT (whiten) with some scaling to keep 
-                    # the image amplitude about the same
-                    fftj = fftj/abs( fftj )*p/len(fftj)
 
                 # compute the cross correlation
                 # fpad does the interpolation
                 # we toss the imag part, which should just be rounding error
-                xcs[k] = np.fft.ifft( fpad( ffti*W*fftj.conj(), P ) ).real
+                xcs[k] = np.fft.ifft( fpad( ffts[i]*W*ffts[j].conj(), P ) ).real
                 k += 1
 
         ###
