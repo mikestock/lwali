@@ -264,6 +264,8 @@ if __name__ == '__main__':
         for i in range(M):
             ffti = np.fft.fft( data[i], 2*I )
             if settings.whiten:
+                # TODO - not clear that this will works, since some of the 
+                #        frequency bins (should) have 0 power in them.
                 # what is the mean rms amplitude of the current spectra?
                 p = abs(ffti).sum().real
                 # normalize the FFT (whiten) with some scaling to keep 
