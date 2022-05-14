@@ -140,7 +140,7 @@ def image( 	np.ndarray[	float, ndim=2] xc,
                     continue
                 
                 #add this to the image (and normalize)
-                pixelValue +=  1#quadint( xc,k, tau )
+                pixelValue +=  quadint( xc,k, tau )
             Output[i,j] = pixelValue/xcM
     
     return Output
