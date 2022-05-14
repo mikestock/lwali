@@ -158,15 +158,19 @@ if __name__ == '__main__':
 
     ###
     # next up is the array geometry
+    loc  = np.zeros( [M,3] )
     ang  = np.zeros( [M*(M-1)//2, 2], dtype='float32' )     #baseline angles
     dls  = np.zeros( M*(M-1)//2, dtype='float32' )          #store the delays in an array
     bls  = np.zeros( M*(M-1)//2, dtype='float32' )          #sotre the baselines in an array
+    antennaPairs = []
     # Loop over antenna pairs
     k = 0   #location in the arrays above
     for i in range(M):
         
         iX = timeSeriesDsets[i].attrs['x']
         iY = timeSeriesDsets[i].attrs['y']
+        iZ = timeSeriesDsets[i].attrs['z']
+        loc[i] = iX, iY, iZ 
 
         for j in range(i+1,M):
             # edge case that shouldn't happen
@@ -177,9 +181,16 @@ if __name__ == '__main__':
             jY = timeSeriesDsets[j].attrs['y']
 
 
+            D = np.sqrt( (iX-jX)**2 + (iY-jY)**2 )
+            if D < settings.minbaseline: continue
+
+            # because we don't store all the baseline pairs, 
+            # we need to store the ones we do
+            antennaPairs.append( (i,j) )
+
             # what's the baseline between these two antennas
             # this ignores distance in z direction
-            bls[k] = np.sqrt( (iX-jX)**2 + (iY-jY)**2 )
+            bls[k] = D
             
             # what's the angle between the antennas?
             # this does not include z contribution
@@ -191,6 +202,12 @@ if __name__ == '__main__':
             dls[k] = 0
 
             k += 1
+    
+    # Trim the imaging arrays
+    ang = ang[:k]
+    bls = bls[:k]
+    dls = dls[:k]
+
     ###
     # time weighting, to weight solution towards the center of the window
     Wt_raise = 0.16	#for hamming, Wt_raise = 0.08
@@ -202,7 +219,7 @@ if __name__ == '__main__':
     W = np.zeros( 2*I, dtype='int' )
     W[ (abs(f)>=settings.bandwidth[0])&(abs(f)<=settings.bandwidth[1]) ] += 1
 
-    print ('Imaging with %i antennas'%M)
+    print ('Imaging with %i antennas and %i baselines'%(M, len(antennaPairs) ) )
     print ('Found %i antennas, with maximum baseline %0.2f m'%(M, bls.max()))
 
     print ('**** ****')
@@ -214,16 +231,23 @@ if __name__ == '__main__':
     outputFile = h5py.File( settings.outputpath, mode='w' )
     outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
     #store settings information in here
-    outputDset.attrs['samplerate']  = settings.samplerate
-    outputDset.attrs['bandwidth']   = settings.bandwidth
-    outputDset.attrs['startsample'] = settings.startsample
-    outputDset.attrs['stopsample']  = settings.stopsample
-    outputDset.attrs['inttime']     = settings.inttime
-    outputDset.attrs['steptime']    = settings.steptime
-    outputDset.attrs['interpolation'] = settings.interpolation
+    outputFile.attrs['samplerate']  = settings.samplerate
+    outputFile.attrs['bandwidth']   = settings.bandwidth
+    outputFile.attrs['startsample'] = settings.startsample
+    outputFile.attrs['stopsample']  = settings.stopsample
+    outputFile.attrs['inttime']     = settings.inttime
+    outputFile.attrs['steptime']    = settings.steptime
+    outputFile.attrs['interpolation'] = settings.interpolation
+    outputFile.attrs['whiten']      = settings.whiten
+    outputFile.attrs['stands']      = settings.antennas['stands']
+    # outputFile.attrs['standlocs']   = loc
+    # outputFile.attrs['ang']         = ang
+    # outputFile.attrs['bls']         = bls
+    # outputFile.attrs['dls']         = dls
+
+    #these are about the actual resultant image
     outputDset.attrs['imagesize']   = settings.imagesize
     outputDset.attrs['bbox']        = settings.bbox
-    outputDset.attrs['whiten']      = settings.whiten
     specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
     # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
@@ -256,8 +280,6 @@ if __name__ == '__main__':
         ###
         # Correlate
         xcs  = np.zeros( [M*(M-1)//2, I*P*2], dtype='float32' ) #store the xcross correlations in an array
-        # loop over antenna pairs
-        k = 0   #location in xcs
 
         ffts = np.zeros( (M,2*I), dtype='complex64' )
         spec = np.zeros( 2*I, dtype='float32' )
@@ -275,17 +297,19 @@ if __name__ == '__main__':
             spec += abs( ffti ) / M
         specDset[iFrame] = spec    
 
-        for i in range(M):
-            for j in range(i+1,M):
-                # edge case that shouldn't come up if loops loop right
-                if i == j:
-                    continue
+        # loop over antenna pairs
+        k = 0   #location in xcs
+        for i,j in antennaPairs:
 
-                # compute the cross correlation
-                # fpad does the interpolation
-                # we toss the imag part, which should just be rounding error
-                xcs[k] = np.fft.ifft( fpad( ffts[i]*W*ffts[j].conj(), P ) ).real
-                k += 1
+            # edge case that shouldn't come up if loops loop right
+            if i == j:
+                continue
+
+            # compute the cross correlation
+            # fpad does the interpolation
+            # we toss the imag part, which should just be rounding error
+            xcs[k] = np.fft.ifft( fpad( ffts[i]*W*ffts[j].conj(), P ) ).real
+            k += 1
 
         ###
         # Image

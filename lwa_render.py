@@ -24,12 +24,14 @@ if __name__ == '__main__':
     frames = inputFile[ 'dirty' ]
     print ('loaded file has shape: %s'%repr( frames.shape ) )
     #override settings we loaded from the config in perfernces for settings stored in the hdf5 file
+    for key in inputFile.attrs.keys():
+        setattr( settings, key, inputFile.attrs[key])
     for key in frames.attrs.keys():
         setattr( settings, key, frames.attrs[key])
-    # frames = np.memmap( settings.outputpath, mode='r',  dtype='float32', shape=(NFrames,NImage,NImage) )
 
     NFrames = (settings.stopsample-settings.startsample)//settings.steptime
     NImage  = settings.imagesize
+    print (NFrames, NImage)
 
     fig = plt.figure( figsize=figsize )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
