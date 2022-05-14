@@ -10,8 +10,6 @@ import lwa_image as lwai #config reading
 
 figsize = 6,6
 
-REDNERMAX = True
-INTEGRATE = True
 
 if __name__ == '__main__':
     # load the configuration
