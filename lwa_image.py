@@ -224,6 +224,7 @@ if __name__ == '__main__':
     outputDset.attrs['imagesize']   = settings.imagesize
     outputDset.attrs['bbox']        = settings.bbox
     outputDset.attrs['whiten']      = settings.whiten
+    specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
     # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
     s = NFrames*NImage*NImage*2/1024/1024
@@ -259,6 +260,7 @@ if __name__ == '__main__':
         k = 0   #location in xcs
 
         ffts = np.zeros( (M,2*I), dtype='complex64' )
+        spec = np.zeros( 2*I, dtype='float32' )
         for i in range(M):
             ffti = np.fft.fft( data[i], 2*I )
             if settings.whiten:
@@ -268,7 +270,8 @@ if __name__ == '__main__':
                 # the image amplitude about the same
                 ffti = ffti/abs( ffti )*p/len(ffti)
             ffts[i] = ffti
-            
+            spec += abs( ffti ) / M
+        specDset[iFrame] = spec    
 
         for i in range(M):
             for j in range(i+1,M):
