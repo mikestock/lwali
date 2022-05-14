@@ -260,7 +260,7 @@ if __name__ == '__main__':
 
         ffts = np.zeros( (M,2*I), dtype='complex64' )
         for i in range(M):
-            fftsi = np.fft.fft( data[i], 2*I )
+            ffti = np.fft.fft( data[i], 2*I )
             if settings.whiten:
                 # what is the mean rms amplitude of the current spectra?
                 p = abs(ffti).sum().real
