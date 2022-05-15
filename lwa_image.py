@@ -239,11 +239,14 @@ if __name__ == '__main__':
     outputFile.attrs['steptime']    = settings.steptime
     outputFile.attrs['interpolation'] = settings.interpolation
     outputFile.attrs['whiten']      = settings.whiten
+    ###
+    # If the number of stands is too big, these guys won't actually fit in an attribute
+    # TODO - fix this
     outputFile.attrs['stands']      = settings.antennas['stands']
-    # outputFile.attrs['standlocs']   = loc
-    # outputFile.attrs['ang']         = ang
-    # outputFile.attrs['bls']         = bls
-    # outputFile.attrs['dls']         = dls
+    outputFile.attrs['standlocs']   = loc
+    outputFile.attrs['ang']         = ang
+    outputFile.attrs['bls']         = bls
+    outputFile.attrs['dls']         = dls
 
     #these are about the actual resultant image
     outputDset.attrs['imagesize']   = settings.imagesize
@@ -279,7 +282,7 @@ if __name__ == '__main__':
         
         ###
         # Correlate
-        xcs  = np.zeros( [M*(M-1)//2, I*P*2], dtype='float32' ) #store the xcross correlations in an array
+        xcs  = np.zeros( [len(antennaPairs), I*P*2], dtype='float32' ) #store the xcross correlations in an array
 
         ffts = np.zeros( (M,2*I), dtype='complex64' )
         spec = np.zeros( 2*I, dtype='float32' )

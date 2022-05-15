@@ -7,8 +7,21 @@ import numpy as np #math
 import h5py
 import  os  #general purpose
 import lwa_image as lwai #config reading
+import lwa_imager as imager
 
 figsize = 6,6
+
+def clean( im, psf, iterations=10, factor=0.75 ):
+    output = np.zeros( im.shape )
+    N = im.shape[0]     #size of image
+    M = psf.shape[0]//2 #midpoint of psf
+    for i in range(iterations):
+        l,m = np.unravel_index( im.argmax(), im.shape )
+        amplitude = factor*im[l,m]
+        output[l,m] += amplitude
+        im -= amplitude * psf[ M-l:M-l+N, M-m:M-m+N ]
+    
+    return output
 
 
 if __name__ == '__main__':
@@ -52,6 +65,43 @@ if __name__ == '__main__':
         y = [np.sin(az), np.sin(az+np.pi)]
         plt.plot( x,y, 'w-', alpha=0.2, lw=1 )
     
+    if settings.renderer['deconvolution'] == 'clean':
+        print ( 'Generating PSF for cleaning' )
+        #we need to compute the point spread function
+        #this will be based on an average spectra for the flash
+        I = inputFile.attrs['inttime']
+        M = len( inputFile.attrs['stands'] )
+        P = inputFile.attrs['interpolation']	#interpolation for the xcorr
+        bls = inputFile.attrs['bls'][:]
+        ang = inputFile.attrs['ang'][:]
+        dls = inputFile.attrs['dls'][:]
+
+        # this averaging here will tend to smooth out the PSF
+        # maybe you could get better results if you calculated the PDF for each 
+        # integration period, but that would be basically imaging twice
+        spec = inputFile['spec'][:].mean( axis=0 )
+
+        xcs  = np.zeros( [bls.shape[0], I*P*2], dtype='float32' ) #store the xcross correlations in an array
+        for k in range( bls.shape[0] ):
+            xcs[k] = np.fft.ifft( lwai.fpad( spec**2, P ) ).real
+
+        # the psf is approxiamtely 2x as large as the dirty image, 
+        # so that we can shift it around and there's never edge artifacts
+        bbox = settings.bbox.copy()
+        bbox[0] -= bbox[0].mean()
+        bbox[1] -= bbox[1].mean()
+        pixels = inputFile['dirty'].attrs['imagesize']
+        bbox *= (2*pixels-1)/pixels
+        pixels = 2*pixels-1
+
+        # finding the psf is done the same way we did the imaging
+        psf = imager.image( xcs, bls, dls, ang, 
+            N=pixels, fs=inputFile.attrs['samplerate']/1e6*P,
+            bbox=bbox, C=settings.speedoflight/1e6 )
+        
+        # normalize
+        psf/=psf.max()
+
     # integrations
     imInt = np.zeros( (NImage, NImage) )
     
@@ -72,6 +122,10 @@ if __name__ == '__main__':
             
             im = np.zeros( (NImage, NImage) )
             im[l,m] = frames[i].max()
+        elif settings.renderer['deconvolution'] == 'clean':
+            factor = settings.renderer['cleaningfactor']
+            iterations = settings.renderer['cleaningiterations']
+            im = clean( frames[i], psf, iterations, factor)
         else:
             # the default is no deconvolution at all
             im = frames[i].astype( 'float32' )
