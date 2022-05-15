@@ -161,8 +161,28 @@ if __name__ == '__main__':
     loc  = np.zeros( [M,3] )
     ang  = np.zeros( [M*(M-1)//2, 2], dtype='float32' )     #baseline angles
     dls  = np.zeros( M*(M-1)//2, dtype='float32' )          #store the delays in an array
-    bls  = np.zeros( M*(M-1)//2, dtype='float32' )          #sotre the baselines in an array
+    bls  = np.zeros( M*(M-1)//2, dtype='float32' )          #store the baselines in an array
+    intdelays  = np.zeros( M, dtype='int' )          #integer sample delays for reading in the data
     antennaPairs = []
+    #loop over antennas for the integer delays based on image center
+    for i in range( M ):
+
+        #get the antenna locations        
+        X = timeSeriesDsets[i].attrs['x']
+        Y = timeSeriesDsets[i].attrs['y']
+
+        #calculate baseline
+        B = X**2 + Y**2
+        #calculate angle components
+        A = X/B, Y/B
+
+        #calculate the delay to this antenna based on image center (in nanoseconds)
+        tau = (A[0]*settings.imagecenter[0]+A[1]*settings.imagecenter[1])*B/(settings.speedoflight/1e9)
+        #make this an integer number of samples
+        intTau = int( tau // timeSeriesDsets[i].attrs['samplePeriod'] )
+
+        intdelays[i] = intTau
+
     # Loop over antenna pairs
     k = 0   #location in the arrays above
     for i in range(M):
@@ -198,8 +218,10 @@ if __name__ == '__main__':
             ang[k][1] = (iY-jY)/bls[k]
 
             # what's the delay difference
-            # we've actually handled all the cable delays, and everything should be aligned
-            dls[k] = 0
+            # We've already handled the cable delays in the tbf conversion step
+            # but, we haven't handled the beam stearing part
+            tau = ( intdelays[i] - intdelays[j] ) * ( timeSeriesDsets[j].attrs['samplePeriod'] )
+            dls[k] = -tau 
 
             k += 1
     
@@ -269,8 +291,9 @@ if __name__ == '__main__':
         # Get Data
         data = []
         dMax = 0
-        for dset in timeSeriesDsets:
-            offset = dset.attrs['integerCableDelay']
+        for k in range( len( timeSeriesDsets) ):
+            dset = timeSeriesDsets[k]
+            offset = dset.attrs['integerCableDelay'] + intdelays[k]
             #TODO - What is this factor of 1000 for?
             sampleGain = dset.attrs['sampleGain']*1000
             d = dset[ iSample+offset:iSample+offset+settings.inttime ]

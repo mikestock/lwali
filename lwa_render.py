@@ -15,8 +15,12 @@ def clean( im, psf, iterations=10, factor=0.75 ):
     output = np.zeros( im.shape )
     N = im.shape[0]     #size of image
     M = psf.shape[0]//2 #midpoint of psf
+    imMax=im.max()
     for i in range(iterations):
         l,m = np.unravel_index( im.argmax(), im.shape )
+        #break condition
+        if im[l,m] < imMax/3:
+            break
         amplitude = factor*im[l,m]
         output[l,m] += amplitude
         im -= amplitude * psf[ M-l:M-l+N, M-m:M-m+N ]
@@ -132,16 +136,18 @@ if __name__ == '__main__':
             # I want to do some non-linear scaling, which doesn't like 
             # negative numbers
             im[ im< 0 ] = 0
-        
-        # add the instantaneous frame from the imager to the current frame
-        imFrame += im
+      
         
         # tracking the maximum brightness, mostly for rendering reasons
         if im.max() > imMax:
             imMax = im.max()
         if im.max() < imMin:
             imMin = im.max()
-        
+
+        # add the instantaneous frame from the imager to the current frame
+        im[ np.log(im +1) < vmin ] = 0
+        imFrame += im
+
         # do we render the frame yet?
         if i%settings.renderer['frameintegration'] == 0:
             # this actually displays the frame
