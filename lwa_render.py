@@ -53,13 +53,18 @@ if __name__ == '__main__':
     fig = plt.figure( figsize=figsize )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
     
+    if settings.renderer['deconvolution'].lower() != 'none':
+        txtcolor = 'w'
+    else:
+        txtcolor = 'k'
+
     # the elevation lines
     th = np.linspace( 0, 2*np.pi, 100 )
     for el in range( 10,90,10 ):
         el *= np.pi/180 #convert to radians
         el = np.cos(el)  #convert to cosine projection
-        plt.plot( el*np.cos(th), el*np.sin(th), 'w-', alpha=0.2, lw=1 )
-    plt.plot( np.cos(th), np.sin(th), 'w-' )
+        plt.plot( el*np.cos(th), el*np.sin(th), txtcolor+'-', alpha=0.2, lw=1 )
+    plt.plot( np.cos(th), np.sin(th), txtcolor+'-' )
     #~ # the zenith
     #~ plt.plot( [0],[0], 'w+' )
     # the azimuth lines
@@ -67,7 +72,7 @@ if __name__ == '__main__':
         az *= np.pi/180 #convert to radians
         x = [np.cos(az), np.cos(az+np.pi)]
         y = [np.sin(az), np.sin(az+np.pi)]
-        plt.plot( x,y, 'w-', alpha=0.2, lw=1 )
+        plt.plot( x,y, txtcolor+'-', alpha=0.2, lw=1 )
     
     if settings.renderer['deconvolution'] == 'clean':
         print ( 'Generating PSF for cleaning' )
@@ -135,7 +140,7 @@ if __name__ == '__main__':
             im = frames[i].astype( 'float32' )
             # I want to do some non-linear scaling, which doesn't like 
             # negative numbers
-            im[ im< 0 ] = 0
+            # im[ im< 0 ] = 0
       
         
         # tracking the maximum brightness, mostly for rendering reasons
@@ -145,23 +150,34 @@ if __name__ == '__main__':
             imMin = im.max()
 
         # add the instantaneous frame from the imager to the current frame
-        im[ np.log(im +1) < vmin ] = 0
-        imFrame += im
+        if settings.renderer['deconvolution'].lower() != 'none':
+            im[ np.log(im +1) < vmin ] = 0
+            imFrame += im
 
         # do we render the frame yet?
         if i%settings.renderer['frameintegration'] == 0:
             # this actually displays the frame
-            ret = plt.imshow( np.log( imFrame.T +1 ), extent=settings.bbox.flatten(), origin='lower', 
-                interpolation='None', vmin=vmin, vmax=vmax )
+            if settings.renderer['deconvolution'].lower() != 'none':
+                ret = plt.imshow( np.log( imFrame.T +1 ), extent=settings.bbox.flatten(), origin='lower', 
+                    interpolation='None', vmin=vmin, vmax=vmax )
+            else:
+                vmax = max( im.max(), -im.min() )
+                ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
+                    interpolation='None', vmax=vmax, vmin=-vmax, cmap='seismic' )                
             
             # Add some text with the time in the corner
-            t = i*settings.steptime/settings.samplerate*1000    #in ms
-            txt = fig.text( 0.05,0.95, '%1.4f ms'%t, color='w' )
+            if not settings.renderer['sampletime']:
+                t = i*settings.steptime/settings.samplerate*1000    #in ms
+                txt = fig.text( 0.05,0.95, '%1.4f ms'%t, color=txtcolor )
+            else:
+                t = i*settings.steptime + settings.startsample
+                txt = fig.text( 0.05,0.95, '%i'%t, color=txtcolor )
             
             # Make the plotting window update
             if settings.renderer['display']:
                 plt.pause( 0.0001 )
-                # tmp = input( 'enter' )
+                if settings.renderer['stepwise']:
+                    tmp = input( 'enter' )
             #~ print (i, im.max()**imEx, imMax**imEx)
             print (i, np.log(im.max()+1), np.log(imMin+1),np.log(imMax+1) )
             

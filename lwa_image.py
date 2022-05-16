@@ -181,7 +181,7 @@ if __name__ == '__main__':
         #make this an integer number of samples
         intTau = int( tau // timeSeriesDsets[i].attrs['samplePeriod'] )
 
-        intdelays[i] = intTau
+        intdelays[i] = -intTau
 
     # Loop over antenna pairs
     k = 0   #location in the arrays above
