@@ -8,6 +8,7 @@ import h5py
 import  os  #general purpose
 import lwa_image as lwai #config reading
 import lwa_imager as imager
+import sys
 
 figsize = 6,6
 
@@ -34,10 +35,14 @@ if __name__ == '__main__':
 
     # how big is the output?
 
-       
-    # load the output data
-    # print ("Loading output file: %s, shape (%i,%i,%i)"%(settings.outputpath,NFrames,NImage,NImage))
-    inputFile = h5py.File( settings.outputpath, 'r' )
+
+    # load the output data   
+    dirtypath = sys.argv[-1]
+    try:
+        inputFile = h5py.File( dirtypath, 'r' )
+    except:
+        inputFile = h5py.File( settings.dirtypath, 'r' )
+    
     frames = inputFile[ 'dirty' ]
     print ('loaded file has shape: %s'%repr( frames.shape ) )
     #override settings we loaded from the config in perfernces for settings stored in the hdf5 file
@@ -54,7 +59,7 @@ if __name__ == '__main__':
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
     
     if settings.renderer['deconvolution'].lower() != 'none':
-        txtcolor = 'w'
+        txtcolor = 'k'
     else:
         txtcolor = 'k'
 
@@ -119,11 +124,11 @@ if __name__ == '__main__':
     i = 0
     imMax = 0
     imMin = 1e9
-    imFrame = np.zeros( (NImage, NImage) )
+    imFrame   = np.zeros( (NImage, NImage) )
+    imSparkle = np.zeros( (NImage, NImage) )    #always current frame
     vmax = settings.renderer['vmax']
     vmin = settings.renderer['vmin']
     while i < NFrames:
-        
         #deconvolution
         if settings.renderer['deconvolution'] == 'max':
             # simplest deconvolution, just use the max of the dirty image
@@ -153,18 +158,29 @@ if __name__ == '__main__':
         if settings.renderer['deconvolution'].lower() != 'none':
             im[ np.log(im +1) < vmin ] = 0
             imFrame += im
+            imSparkle += im
 
         # do we render the frame yet?
         if i%settings.renderer['frameintegration'] == 0:
             # this actually displays the frame
             if settings.renderer['deconvolution'].lower() != 'none':
                 ret = plt.imshow( np.log( imFrame.T +1 ), extent=settings.bbox.flatten(), origin='lower', 
-                    interpolation='None', vmin=vmin, vmax=vmax )
+                    interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )
             else:
                 vmax = max( im.max(), -im.min() )
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmax=vmax, vmin=-vmax, cmap='seismic' )                
-            
+
+            # Sparkles
+            if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
+                # imSparkle[ imSparkle > 0 ] = 1
+                imSparkle = np.log( imSparkle +1 )
+                imSparkle /= settings.renderer['sparklemax']
+                imSparkle[ imSparkle == 0 ] = np.nan
+                ret2 = plt.imshow( imSparkle.T , extent=settings.bbox.flatten(), origin='lower', 
+                    interpolation='None', vmin=0, vmax=1, cmap='cool' )
+
+
             # Add some text with the time in the corner
             if not settings.renderer['sampletime']:
                 t = i*settings.steptime/settings.samplerate*1000    #in ms
@@ -179,7 +195,7 @@ if __name__ == '__main__':
                 if settings.renderer['stepwise']:
                     tmp = input( 'enter' )
             #~ print (i, im.max()**imEx, imMax**imEx)
-            print (i, np.log(im.max()+1), np.log(imMin+1),np.log(imMax+1) )
+            print (i, np.log(imFrame.max()+1), np.log(imMin+1), np.log(imMax+1) )
             
             # save the frame output?
             if settings.renderer['saveoutput']:
@@ -189,11 +205,14 @@ if __name__ == '__main__':
             # remove the changing stuff
             ret.remove()
             txt.remove()
+            if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
+                ret2.remove()
         
             # now that we've plotted stuff, reset the frame (unless we don't)
             if not settings.renderer['videointegration']:
                 imFrame *= 0
-        
+            imSparkle = np.zeros( (NImage, NImage) )    #always current frame
+
         # update the counter
         i += 1
         

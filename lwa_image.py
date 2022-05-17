@@ -23,7 +23,7 @@ class Settings( object ):
         # set some not so crazy defaults
         self.samplerate = 200000000.
         self.bandwidth  = [30000000,80000000]
-        self.inputpath  = None
+        self.timeseriespath  = None
         self.startsample= 0
 
         #use all antennas, with X polarity
@@ -121,11 +121,11 @@ if __name__ == '__main__':
 
 
     # we have an input file right?
-    if not os.path.exists( settings.inputpath ):
+    if not os.path.exists( settings.timeseriespath ):
         raise ValueError( "%s is not a valid input file"%settings.inputfile )
 
     # read the input file
-    inputFile = h5py.File( settings.inputpath, 'r' )
+    inputFile = h5py.File( settings.timeseriespath, 'r' )
 
     # collect all the data to be processed
     timeSeriesDsets = []
@@ -250,7 +250,7 @@ if __name__ == '__main__':
     NImage  = settings.imagesize
     ###
     # I've tried a couple of data types, float16 saturates, as does int16
-    outputFile = h5py.File( settings.outputpath, mode='w' )
+    outputFile = h5py.File( settings.dirtypath, mode='w' )
     outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
     #store settings information in here
     outputFile.attrs['samplerate']  = settings.samplerate
@@ -277,7 +277,7 @@ if __name__ == '__main__':
     # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
     s = NFrames*NImage*NImage*2/1024/1024
-    print ('Creating %s, sized %i MB'%(settings.outputpath, s) )
+    print ('Creating %s, sized %i MB'%(settings.dirtypath, s) )
 
     ######
     # main loop
