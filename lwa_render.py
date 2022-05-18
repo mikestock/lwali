@@ -129,6 +129,14 @@ if __name__ == '__main__':
     vmax = settings.renderer['vmax']
     vmin = settings.renderer['vmin']
     while i < NFrames:
+        iSample = i*settings.steptime + settings.startsample
+        if iSample < settings.renderer['startrender']:
+            #we haven't gotten to the section of the file we want to render
+            i += 1
+            continue
+        if iSample > settings.renderer['stoprender'] and settings.renderer['stoprender'] > 0:
+            #we're done rendering
+            break
         #deconvolution
         if settings.renderer['deconvolution'] == 'max':
             # simplest deconvolution, just use the max of the dirty image
@@ -167,9 +175,11 @@ if __name__ == '__main__':
                 ret = plt.imshow( np.log( imFrame.T +1 ), extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )
             else:
-                vmax = max( im.max(), -im.min() )
+                #linearize the max
+                mx = np.exp( vmax ) -1
+                print( im.max(), mx )
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
-                    interpolation='None', vmax=vmax, vmin=-vmax, cmap='seismic' )                
+                    interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )                
 
             # Sparkles
             if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
@@ -186,7 +196,7 @@ if __name__ == '__main__':
                 t = i*settings.steptime/settings.samplerate*1000    #in ms
                 txt = fig.text( 0.05,0.95, '%1.4f ms'%t, color=txtcolor )
             else:
-                t = i*settings.steptime + settings.startsample
+                t = iSample
                 txt = fig.text( 0.05,0.95, '%i'%t, color=txtcolor )
             
             # Make the plotting window update
