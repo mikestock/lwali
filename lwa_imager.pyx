@@ -119,7 +119,7 @@ def image( 	np.ndarray[	float, ndim=2] xc,
             ###
             # loop over the baselines
             pixelValue = 0
-            for k in range( xc.shape[0] ):
+            for k in range( xcN ):
             # for k in prange( xc.shape[0], nogil=True ):
                 #the time delay for this location on this baseline (in us)
                 #the delay is in ns, everything else is in us
@@ -141,6 +141,6 @@ def image( 	np.ndarray[	float, ndim=2] xc,
                 
                 #add this to the image (and normalize)
                 pixelValue +=  quadint( xc,k, tau )
-            Output[i,j] = pixelValue/xcM
+            Output[i,j] = pixelValue/xcN
     
     return Output
