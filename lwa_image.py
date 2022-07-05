@@ -239,7 +239,8 @@ if __name__ == '__main__':
     # This is a super simple tophat filter
     f = np.fft.fftfreq( 2*I )*settings.samplerate
     W = np.zeros( 2*I, dtype='int' )
-    W[ (abs(f)>=settings.bandwidth[0])&(abs(f)<=settings.bandwidth[1]) ] += 1
+    for low,high in settings.bandwidth:
+        W[ (abs(f)>=low)&(abs(f)<=high) ] = 1
 
     print ('Imaging with %i antennas and %i baselines'%(M, len(antennaPairs) ) )
     print ('Found %i antennas, with maximum baseline %0.2f m'%(M, bls.max()))

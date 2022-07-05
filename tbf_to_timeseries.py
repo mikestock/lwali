@@ -14,7 +14,7 @@ antennas = station.antennas #this is a list of antenna objects
 #built in library information, I'm not sure how any of them wouldn't be.  
 #the list of antennas is ordered, with X pol antennas having pol=0, and Y pol antennas having pol=1
 
-totalChannels  = 4000
+totalChannels  = 4096
 frequencyRange = 40000,88000    #this is really only used for calculating cable delays
 speedOfLight   = 299792458.0
 
@@ -103,10 +103,11 @@ def main( args ):
                 print( 'ERROR Count not find antenna for stand %i pol %i'%(iStand+1, iPol) )
                 sys.exit(1)
 
+            #TODO, confirm this isn't borked up here
             integerCableDelay = int( ant.cable.delay( frequencyRange[1] )*1e9//samplePeriod )
             freq = np.linspace( 0, totalChannels*25000, int(len(timeSeries)/2+1) )
             m = (freq>frequencyRange[0])&(freq<frequencyRange[1])
-            delay = ant.cable.delay( freq[m] )
+            delay = ant.cable.delay( freq[m] )  #sure looks like I'm taking off the entire delay, and not just the fractional part
 
             phaseRot = np.exp(2j*np.pi*freq[m]*( delay-ant.stand.z/speedOfLight) )
             gain = np.sqrt( ant.cable.gain(freq[m]) )
