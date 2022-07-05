@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     # we have an input file right?
     if not os.path.exists( settings.timeseriespath ):
-        raise ValueError( "%s is not a valid input file"%settings.inputfile )
+        raise ValueError( "%s is not a valid input file"%settings.timeseriespath )
 
     # read the input file
     inputFile = h5py.File( settings.timeseriespath, 'r' )
