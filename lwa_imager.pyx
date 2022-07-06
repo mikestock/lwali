@@ -135,14 +135,15 @@ def pimage( float[:,:] xc,
     # Loop through the pixel
     for i in range(N):
         cosa = (bbox[0,1]-bbox[0,0])*(i+.5)/N+bbox[0,0]	
-        for j in range(N):	
+        # for j in range(N):	
+        for j in prange(N, nogil=True):
             cosb = (bbox[1,1]-bbox[1,0])*(j+.5)/N+bbox[1,0]
             
             ###
             # loop over the baselines
             pixelValue = 0
-            for k in prange( xcN, nogil=True ):
-            # for k in prange( xc.shape[0], nogil=True ):
+            # for k in prange( xcN, nogil=True ):
+            for k in range( xcN ):
                 #the time delay for this location on this baseline (in us)
                 #the delay is in ns, everything else is in us
                 tau = (A[k,0]*cosa+A[k,1]*cosb)*bl[k]/C - dl[k]/1000
@@ -178,16 +179,16 @@ def pimage( float[:,:] xc,
                 # cdef float Output = 0, a
                 # #there are 3 terms
                 a = .5*(tau-j0-1)*(tau-j0-2)
-                pixelValue += a*xc[k,j0]
+                pixelValue = pixelValue + a*xc[k,j0]/xcN
                 a = -1*(tau-j0)*(tau-j0-2)
-                pixelValue += a*xc[k,j1]
+                pixelValue = pixelValue + a*xc[k,j1]/xcN
                 a = .5*(tau-j0)*(tau-j0-1)
-                pixelValue += a*xc[k,j2]
+                pixelValue = pixelValue + a*xc[k,j2]/xcN
                 
 
                 #add this to the image (and normalize)
                 # pixelValue +=  quadint( xc,k, tau )
-            Output[i,j] = pixelValue/xcN
+            Output[i,j] = pixelValue
     
     return Output
 
@@ -279,7 +280,7 @@ def image( 	np.ndarray[	float, ndim=2] xc,
                     continue
                 
                 #add this to the image (and normalize)
-                pixelValue +=  quadint( xc,k, tau )
-            Output[i,j] = pixelValue/xcN
+                pixelValue +=  quadint( xc,k, tau )/xcN
+            Output[i,j] = pixelValue
     
     return Output
