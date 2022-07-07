@@ -223,7 +223,7 @@ if __name__ == '__main__':
             if not settings.renderer['videointegration']:
                 imFrame *= 0
             # imSparkle *= np.zeros( (NImage, NImage) )    #always current frame
-            imSparkle *= 0.33
+            imSparkle *= settings.renderer['sparklepersist']
             imSparkle[ np.log( imSparkle+1) < vmin ] = 0
 
         # update the counter
