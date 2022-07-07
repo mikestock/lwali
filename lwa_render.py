@@ -128,6 +128,7 @@ if __name__ == '__main__':
     imSparkle = np.zeros( (NImage, NImage) )    #always current frame
     vmax = settings.renderer['vmax']
     vmin = settings.renderer['vmin']
+    sparklemax = settings.renderer['sparklemax']
     while i < NFrames:
         iSample = i*settings.steptime + settings.startsample
         if iSample < settings.renderer['startrender']:
@@ -184,11 +185,11 @@ if __name__ == '__main__':
             # Sparkles
             if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
                 # imSparkle[ imSparkle > 0 ] = 1
-                imSparkle = np.log( imSparkle +1 )
-                imSparkle /= settings.renderer['sparklemax']
-                imSparkle[ imSparkle == 0 ] = np.nan
-                ret2 = plt.imshow( imSparkle.T , extent=settings.bbox.flatten(), origin='lower', 
-                    interpolation='None', vmin=0, vmax=1, cmap='cool' )
+                im = np.log( imSparkle +1 )
+                # imSparkle /= settings.renderer['sparklemax']
+                im[ im == 0 ] = np.nan
+                ret2 = plt.imshow( im.T , extent=settings.bbox.flatten(), origin='lower', 
+                    interpolation='None', vmin=vmin, vmax=sparklemax, cmap='cool' )
 
 
             # Add some text with the time in the corner
@@ -221,7 +222,9 @@ if __name__ == '__main__':
             # now that we've plotted stuff, reset the frame (unless we don't)
             if not settings.renderer['videointegration']:
                 imFrame *= 0
-            imSparkle = np.zeros( (NImage, NImage) )    #always current frame
+            # imSparkle *= np.zeros( (NImage, NImage) )    #always current frame
+            imSparkle *= 0.33
+            imSparkle[ np.log( imSparkle+1) < vmin ] = 0
 
         # update the counter
         i += 1
