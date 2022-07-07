@@ -55,7 +55,7 @@ if __name__ == '__main__':
     NImage  = settings.imagesize
     print (NFrames, NImage)
 
-    fig = plt.figure( figsize=figsize )
+    fig = plt.figure( figsize=settings.renderer['figsize'] )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
     
     if settings.renderer['deconvolution'].lower() != 'none':
@@ -207,11 +207,19 @@ if __name__ == '__main__':
                     tmp = input( 'enter' )
             #~ print (i, im.max()**imEx, imMax**imEx)
             print (i, np.log(imFrame.max()+1), np.log(imMin+1), np.log(imMax+1) )
-            
+
+            #set the limits
+            if settings.renderer['bbox'] is not None:
+                plt.xlim( settings.renderer['bbox'][0] )
+                plt.ylim( settings.renderer['bbox'][1] )
+            #turn off axes ticks
+            plt.xticks( [] )
+            plt.yticks( [] )
+
             # save the frame output?
             if settings.renderer['saveoutput']:
                 outS = settings.renderer['outputdir'] + 'frame_%06i.png'%i
-                fig.savefig( outS )
+                fig.savefig( outS, dpi=settings.rederer['figdpi'] )
             
             # remove the changing stuff
             ret.remove()
