@@ -180,7 +180,7 @@ if __name__ == '__main__':
                 mx = np.exp( vmax ) -1
                 print( im.max(), mx )
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
-                    interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )                
+                    interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
 
             # Sparkles
             if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
@@ -189,7 +189,7 @@ if __name__ == '__main__':
                 # imSparkle /= settings.renderer['sparklemax']
                 im[ im == 0 ] = np.nan
                 ret2 = plt.imshow( im.T , extent=settings.bbox.flatten(), origin='lower', 
-                    interpolation='None', vmin=vmin, vmax=sparklemax, cmap='cool' )
+                    interpolation='None', vmin=vmin, vmax=sparklemax, cmap=settings.renderer['sparklecmap'] )
 
 
             # Add some text with the time in the corner
@@ -219,7 +219,7 @@ if __name__ == '__main__':
             # save the frame output?
             if settings.renderer['saveoutput']:
                 outS = settings.renderer['outputdir'] + 'frame_%06i.png'%i
-                fig.savefig( outS, dpi=settings.rederer['figdpi'] )
+                fig.savefig( outS, dpi=settings.renderer['figdpi'] )
             
             # remove the changing stuff
             ret.remove()

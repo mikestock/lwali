@@ -193,7 +193,8 @@ for i,j in antennaPairs:
 
 ###
 # Image
-im = imager.image( xcs, bls, dls, ang, 
+sys.exit()
+im = imager.pimage( xcs, bls, dls, ang, 
     N=settings.imagesize, fs=settings.samplerate/1e6*P,
     bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
@@ -245,7 +246,7 @@ bbox *= (2*pixels-1)/pixels
 pixels = 2*pixels-1
 
 # finding the psf is done the same way we did the imaging
-psf = imager.image( xcs, bls, np.zeros( dls.shape), ang, 
+psf = imager.pimage( xcs, bls, np.zeros( dls.shape, dtype='float32'), ang, 
     N=pixels, fs=settings.samplerate/1e6*P,
     bbox=bbox, C=settings.speedoflight/1e6 )
 
