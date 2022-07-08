@@ -27,6 +27,7 @@ def main( args ):
             print( 'Reading data for Stand %i Pol %i'%(iStand+1, iPol))
             #loop over (unordered) list of files
             combinedSpec = {}
+            triggerTime  = 0
             for inputPath in args.input_paths:
 
                 ###
@@ -62,6 +63,8 @@ def main( args ):
 
                         # specTime = cFrame.time.unix
                         specTime = int(cFrame.time.unix*1000000000)    #in ns since 1970
+                        if specTime < triggerTime or triggerTime == 0:
+                            triggerTime = specTime
                         if not specTime in combinedSpec:
                             combinedSpec[specTime] = np.zeros( totalChannels+1, dtype='complex64' )
 
@@ -132,6 +135,7 @@ def main( args ):
             dset.attrs['x'] = ant.stand.x
             dset.attrs['y'] = ant.stand.y
             dset.attrs['z'] = ant.stand.z
+            dset.attrs['triggerTime'] = triggerTime
 
     outputFile.close()
 
