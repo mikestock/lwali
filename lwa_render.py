@@ -218,7 +218,7 @@ if __name__ == '__main__':
 
             # Add some text with the time in the corner
             if not settings.renderer['sampletime']:
-                t = i*settings.steptime/settings.samplerate*1000    #in ms
+                t = iSample/settings.samplerate*1000    #in ms
                 txt = fig.text( 0.05,0.95, '%1.4f ms'%t, color=txtcolor )
             else:
                 t = iSample

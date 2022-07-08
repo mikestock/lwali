@@ -198,6 +198,9 @@ im = imager.pimage( xcs, bls, dls, ang,
     N=settings.imagesize, fs=settings.samplerate/1e6*P,
     bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
+im = imager.image( xcs, bls, dls, ang, 
+    N=settings.imagesize, fs=settings.samplerate/1e6*P,
+    bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
 fig = plt.figure( figsize=figsize )
 fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
