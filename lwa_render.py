@@ -10,7 +10,9 @@ import lwa_image as lwai #config reading
 import lwa_imager as imager
 import sys
 
-figsize = 6,6
+####
+# GLOBALS
+CONFIG_PATH = 'lwa_image.cfg'
 
 def clean( im, psf, iterations=10, factor=0.75 ):
     output = np.zeros( im.shape )
@@ -30,8 +32,18 @@ def clean( im, psf, iterations=10, factor=0.75 ):
 
 
 if __name__ == '__main__':
+
+    # load the configuration.  This can be passed as an option, so 
+    # check the command line first
+    if len( sys.argv ) > 1:
+        # a file was given at the command line, we'll use that
+        configPath = sys.argv[-1]
+    else:
+        # see if there's something in config
+        configPath = CONFIG_PATH
+
     # load the configuration
-    settings = lwai.read_config()
+    settings = lwai.read_config(configPath)
 
     # how big is the output?
 
@@ -131,7 +143,7 @@ if __name__ == '__main__':
     sparklemax = settings.renderer['sparklemax']
     while i < NFrames:
         iSample = i*settings.steptime + settings.startsample
-        if iSample < settings.renderer['startrender']:
+        if iSample < settings.renderer['startrender'] and not settings.renderer['videointegration']:
             #we haven't gotten to the section of the file we want to render
             i += 1
             continue
@@ -168,6 +180,13 @@ if __name__ == '__main__':
             im[ np.log(im +1) < vmin ] = 0
             imFrame += im
             imSparkle += im
+        else:
+            imFrame += im
+
+        if iSample < settings.renderer['startrender']:
+            #we've done the video integration, so we're done now
+            i += 1
+            continue        
 
         # do we render the frame yet?
         if i%settings.renderer['frameintegration'] == 0:
@@ -177,10 +196,15 @@ if __name__ == '__main__':
                     interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )
             else:
                 #linearize the max
-                mx = np.exp( vmax ) -1
+                mx = np.exp( sparklemax ) -1
                 print( im.max(), mx )
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
+                # im2 = np.log( imFrame +1 ) 
+                # print( im2.max() )
+                # im2[ im2< vmin ] = np.nan
+                # ret2 = plt.imshow( im2, extent=settings.bbox.flatten(), origin='lower', 
+                #     interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )                
 
             # Sparkles
             if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':

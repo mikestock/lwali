@@ -265,11 +265,12 @@ if __name__ == '__main__':
     ###
     # If the number of stands is too big, these guys won't actually fit in an attribute
     # TODO - fix this
-    outputFile.attrs['stands']      = settings.antennas['stands']
-    outputFile.attrs['standlocs']   = loc
-    outputFile.attrs['ang']         = ang
-    outputFile.attrs['bls']         = bls
-    outputFile.attrs['dls']         = dls
+    if len( loc ) < 32:
+        outputFile.attrs['stands']      = settings.antennas['stands']
+        outputFile.attrs['standlocs']   = loc
+        outputFile.attrs['ang']         = ang
+        outputFile.attrs['bls']         = bls
+        outputFile.attrs['dls']         = dls
 
     #these are about the actual resultant image
     outputDset.attrs['imagesize']   = settings.imagesize
