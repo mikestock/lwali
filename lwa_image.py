@@ -341,9 +341,14 @@ if __name__ == '__main__':
 
         ###
         # Image
-        im = imager.pimage( xcs, bls, dls, ang, 
-            N=settings.imagesize, fs=settings.samplerate/1e6*P,
-            bbox=settings.bbox, C=settings.speedoflight/1e6 )
+        if settings.azel:
+            im = imager.pimage_azel( xcs, bls, dls, ang, 
+                N=settings.imagesize, fs=settings.samplerate/1e6*P,
+                bbox=settings.bbox, C=settings.speedoflight/1e6 )
+        else:
+            im = imager.pimage( xcs, bls, dls, ang, 
+                N=settings.imagesize, fs=settings.samplerate/1e6*P,
+                bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
         ###
         # Save to Output
