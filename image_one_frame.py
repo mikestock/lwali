@@ -18,7 +18,8 @@ configPath = 'lwa_image.cfg'
 settings = read_config(configPath=configPath)
 inputFile = h5py.File( settings.timeseriespath, 'r' )
 
-iSample = 35392000
+# iSample = 35392000
+iSample = 39720800
 figsize = 6,6
 
 
