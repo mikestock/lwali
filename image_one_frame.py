@@ -11,7 +11,6 @@ import os, sys, time    #libraries I just tend to use
 import lwa_imager as imager
 from lwa_image import *
 import matplotlib.pyplot as plt
-
 plt.ion()
 
 configPath = 'lwa_image.cfg'
@@ -195,6 +194,7 @@ for i,j in antennaPairs:
 ###
 # Image
 sys.exit()
+
 im = imager.pimage( xcs, bls, dls, ang, 
     N=settings.imagesize, fs=settings.samplerate/1e6*P,
     bbox=settings.bbox, C=settings.speedoflight/1e6 )
