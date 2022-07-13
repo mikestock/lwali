@@ -49,11 +49,7 @@ if __name__ == '__main__':
 
 
     # load the output data   
-    dirtypath = sys.argv[-1]
-    try:
-        inputFile = h5py.File( dirtypath, 'r' )
-    except:
-        inputFile = h5py.File( settings.dirtypath, 'r' )
+    inputFile = h5py.File( settings.dirtypath, 'r' )
     
     frames = inputFile[ 'dirty' ]
     print ('loaded file has shape: %s'%repr( frames.shape ) )
