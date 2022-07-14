@@ -10,23 +10,44 @@ import lwa_image as lwai #config reading
 import lwa_imager as imager
 import sys
 
+plt.ion()
+
 ####
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
 
 def centroid( im, sigma=None ):
-    if sigma is None:
-        sigma = im.shape[0]/10
     im = im.copy()
-    im[im<0] = 0
+
     #sigma in pixels
     i,j = np.unravel_index( im.argmax(), im.shape )
     x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
 
-    #this is a guassian weighting function
-    W = np.exp( -( (x-j)**2 + (y-i)**2 )/2/sigma**2 )
+    #do we have a sigma to work with, this should be the angular resolution
+    #of the image
+    if sigma is None:
+        ii = i
+        while im[ii,j] >0:
+            ii += 1
+            if ii >= im.shape[0]: break
+        jj = j
+        while im[i,jj] >0:
+            jj += 1
+            if jj >= im.shape[1]: break
+        #this is the appoximate half-radius of the peak
+        #whcih seems like a good sigma
+        sigma = (jj-j + ii-i) / 4
+    #set a lower bounds for sigma
+    if sigma <1: sigma=1
 
-    #the centroid, based on the guassian weightning
+
+    im[im<0] = 0
+
+    #this is a modified guassian weighting function
+    exp = 6
+    W = np.exp( -( abs(x-j)**exp + (y-i)**2 )/2/sigma**exp )
+
+    #the centroid, based on the modified guassian weightning
     i_bar,j_bar = (W*im*y).sum()/(W*im).sum(), (W*im*x).sum()/(W*im).sum() 
 
     #what is left after the centroid
@@ -34,9 +55,9 @@ def centroid( im, sigma=None ):
 
     return i_bar, j_bar, resid
 
-def index2cosab( i,j ):
-    N = settings.imagesize
-    bbox = settings.bbox
+def index2cosab( i,j, frames ):
+    N    = frames.attrs['imagesize']
+    bbox = frames.attrs['bbox']
     cosa = (bbox[0,1]-bbox[0,0])*(i+.5)/N+bbox[0,0]
     cosb = (bbox[1,1]-bbox[1,0])*(j+.5)/N+bbox[1,0]
     return cosa, cosb
@@ -60,7 +81,7 @@ if __name__ == '__main__':
 
     # load the output data   
     inputFile = h5py.File( settings.dirtypath, 'r' )
-    
+
     frames = inputFile[ 'dirty' ]
     print ('loaded file has shape: %s'%repr( frames.shape ) )
     #override settings we loaded from the config in perfernces for settings stored in the hdf5 file
@@ -103,6 +124,7 @@ if __name__ == '__main__':
     ######
     # Main loop, loop until we run out of frames from the imager
     iFrame = 0
+    
     while iFrame < NFrames:
         iSample = iFrame*settings.steptime + settings.startsample
         tSample = iSample/settings.samplerate*1000    #in ms
@@ -116,9 +138,24 @@ if __name__ == '__main__':
         #get the centroid location of the peak brightness of this frame (in indices)
         #r is the mean residual amplitude
         i,j,r = centroid( frame )
-        ca,cb = index2cosab( i,j )
+        ca,cb = index2cosab( i,j, frames )
         #get the amplitude of this point.  We could interpolate this, but I'm not going to bother
         brightness = frame.max() 
+
+        # mx = abs(frame).max()
+        # ret = plt.imshow( frame.T, extent=settings.bbox.flatten(), origin='lower', 
+        #     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
+
+        # ret2, = plt.plot( ca,cb, 'kx' )
+
+        # plt.pause( .1 )
+
+        # if mx > 1000:
+        #     input( 'enter')
+
+        # ret.remove()
+        # ret2.remove()
+
 
         #set the output
         outputDset[ iFrame ] = tSample, ca, cb, brightness, r
