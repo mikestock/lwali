@@ -34,18 +34,18 @@ def centroid( im, sigma=None ):
         while im[i,jj] >0:
             jj += 1
             if jj >= im.shape[1]: break
-        #this is the appoximate half-radius of the peak
+        #this is the appoximate radius of the peak
         #whcih seems like a good sigma
-        sigma = (jj-j + ii-i) / 4
-    #set a lower bounds for sigma
-    if sigma <1: sigma=1
+        sigma = (jj-j + ii-i) / 2
+        #set a lower bounds for sigma, we don't want it to not average pixels next to the peak
+        if sigma <2: sigma=2
 
 
     im[im<0] = 0
 
     #this is a modified guassian weighting function
-    exp = 6
-    W = np.exp( -( abs(x-j)**exp + (y-i)**2 )/2/sigma**exp )
+    exp = 4 #if this is 2, the weightning function is exactly guassian
+    W = np.exp( -( abs(x-j)**exp + abs(y-i)**exp )/2/sigma**exp )
 
     #the centroid, based on the modified guassian weightning
     i_bar,j_bar = (W*im*y).sum()/(W*im).sum(), (W*im*x).sum()/(W*im).sum() 
@@ -160,7 +160,13 @@ if __name__ == '__main__':
         #set the output
         outputDset[ iFrame ] = tSample, ca, cb, brightness, r
 
-        print( tSample, ca,cb )
+        if iFrame%1000 == 0:
+            print (tSample )
+            plt.cla()
+            im = np.histogram2d( outputDset[:,1], outputDset[:,2], weights=outputDset[:,3], bins=1000, range=[[-1,1],[-1,1]] )
+            plt.imshow( im[0]**.25, origin='lower', extent=[-1,1,-1,1]  )
+            plt.pause(.1 )
+
 
         iFrame += 1
     
