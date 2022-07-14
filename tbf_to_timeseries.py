@@ -18,7 +18,23 @@ totalChannels  = 4096
 frequencyRange = 40000,88000    #this is really only used for calculating cable delays
 speedOfLight   = 299792458.0
 
-def main( args ):
+
+
+if __name__ == '__main__' :
+    #parse the command line
+    parser = argparse.ArgumentParser(
+        description='Convert a TBF file into a continuous timeseries', 
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        )
+
+    parser.add_argument('input_paths', type=str, nargs='+',
+                        help='filenames to convert')
+    parser.add_argument('output_path', type=str, 
+                        help='where to store the output')
+
+    args = parser.parse_args()
+    # main( args )
+# def main( args ):
     outputFile = h5py.File( args.output_path, 'w' )
 
     #store combined spectrum stuff here
@@ -107,12 +123,19 @@ def main( args ):
                 sys.exit(1)
 
             #TODO, confirm this isn't borked up here
-            integerCableDelay = int( ant.cable.delay( frequencyRange[1] )*1e9//samplePeriod )
-            freq = np.linspace( 0, totalChannels*25000, int(len(timeSeries)/2+1) )
-            m = (freq>frequencyRange[0])&(freq<frequencyRange[1])
-            delay = ant.cable.delay( freq[m] )  #sure looks like I'm taking off the entire delay, and not just the fractional part
 
-            phaseRot = np.exp(2j*np.pi*freq[m]*( delay-ant.stand.z/speedOfLight) )
+            N = int(len(timeSeries)/2+1)
+            freq = np.linspace( 0, totalChannels*25000, N )
+            m = (freq>frequencyRange[0]*1000)&(freq<frequencyRange[1]*1000)
+            #this is the cable delay, measured in sampled
+            delay = ant.cable.delay( freq[m] )*1e9/samplePeriod  
+            #remove the smallest integer number of samples from this delay
+            integerCableDelay = int( delay.min() )
+            delay -= integerCableDelay
+
+            phaseRot = np.exp( 1j*np.pi*np.arange(N)[m]*delay/N )
+            # this is written for delays in nseconds
+            # phaseRot = np.exp(2j*np.pi*freq[m]*( delay-ant.stand.z/speedOfLight) )
             gain = np.sqrt( ant.cable.gain(freq[m]) )
 
             print ('Applying cable delays, this is 2 very large FFTs, stand by')
@@ -138,19 +161,3 @@ def main( args ):
             dset.attrs['triggerTime'] = triggerTime
 
     outputFile.close()
-
-
-if __name__ == '__main__' :
-    #parse the command line
-    parser = argparse.ArgumentParser(
-        description='Convert a TBF file into a continuous timeseries', 
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-        )
-
-    parser.add_argument('input_paths', type=str, nargs='+',
-                        help='filenames to convert')
-    parser.add_argument('output_path', type=str, 
-                        help='where to store the output')
-
-    args = parser.parse_args()
-    main( args )
