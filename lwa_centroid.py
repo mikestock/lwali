@@ -2,6 +2,7 @@
 # Python 2/3 compatibility stuff
 from __future__ import print_function
 from __future__ import division
+from email.errors import InvalidMultipartContentTransferEncodingDefect
 import matplotlib.pyplot as plt #plotting
 import numpy as np #math
 import h5py
@@ -44,7 +45,7 @@ def centroid( im, sigma=None ):
     im[im<0] = 0
 
     #this is a modified guassian weighting function
-    E = 6 #if this is 2, the weightning function is exactly guassian
+    E = 16 #if this is 2, the weightning function is exactly guassian
     # W = np.exp( -( abs(x-j)**E + abs(y-i)**E )/2/sigma**E )
     W = sigma**E / ( (abs(x-j)**2 + abs(y-i)**2)**(E/2.0) + sigma**E )
 
@@ -77,10 +78,7 @@ if __name__ == '__main__':
     # load the configuration
     settings = lwai.read_config(configPath)
 
-    # how big is the output?
-
-
-    # load the output data   
+    # load the dirty image data   
     inputFile = h5py.File( settings.dirtypath, 'r' )
 
     frames = inputFile[ 'dirty' ]
@@ -97,30 +95,36 @@ if __name__ == '__main__':
 
     fig = plt.figure( figsize=settings.renderer['figsize'] )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
-    
-    txtcolor = 'k'
-
-    # the elevation lines
-    th = np.linspace( 0, 2*np.pi, 100 )
-    for el in range( 10,90,10 ):
-        el *= np.pi/180 #convert to radians
-        el = np.cos(el)  #convert to cosine projection
-        plt.plot( el*np.cos(th), el*np.sin(th), txtcolor+'-', alpha=0.2, lw=1 )
-    plt.plot( np.cos(th), np.sin(th), txtcolor+'-' )
-    #~ # the zenith
-    #~ plt.plot( [0],[0], 'w+' )
-    # the azimuth lines
-    for az in range( 0,180,10 ):
-        az *= np.pi/180 #convert to radians
-        x = [np.cos(az), np.cos(az+np.pi)]
-        y = [np.sin(az), np.sin(az+np.pi)]
-        plt.plot( x,y, txtcolor+'-', alpha=0.2, lw=1 )
 
     ###
     # initialize the output
     # this overwrites the output file
     outputFile = h5py.File( settings.centroidpath, mode='w' )
     outputDset = outputFile.create_dataset( 'centroids', shape=(NFrames,5), dtype='float32')
+
+    #copy over the attributes from the dirty file to the centroid file
+    for k in inputFile.attrs.keys():
+        v = inputFile.attrs[k]
+        outputFile.attrs[k] = v
+    for k in frames.attrs.keys():
+        v = frames.attrs[k]
+        outputDset.attrs[k] = v
+
+    #estimate the angular resolution of the interferometer, and how many pixels that is
+    maxFrequency = 0
+    for bw in settings.bandwidth:
+        for f in bw:
+            if f > maxFrequency:
+                maxFrequency = f
+    #this will be in image plane units
+    #nominal array diameter is 100 meters
+    sigma = 2*settings.speedoflight/maxFrequency / 100
+
+    #convert to pixels
+    dca = (frames.attrs['bbox'][0][1]-frames.attrs['bbox'][0][0])/frames.attrs['imagesize']
+    print ( 'sigma',sigma, dca )
+    sigma /= dca
+    print ( 'sigma',sigma )
 
     ######
     # Main loop, loop until we run out of frames from the imager
@@ -138,7 +142,7 @@ if __name__ == '__main__':
 
         #get the centroid location of the peak brightness of this frame (in indices)
         #r is the mean residual amplitude
-        i,j,r = centroid( frame )
+        i,j,r = centroid( frame, sigma=sigma )
         ca,cb = index2cosab( i,j, frames )
         #get the amplitude of this point.  We could interpolate this, but I'm not going to bother
         brightness = frame.max() 
