@@ -44,8 +44,9 @@ def centroid( im, sigma=None ):
     im[im<0] = 0
 
     #this is a modified guassian weighting function
-    exp = 4 #if this is 2, the weightning function is exactly guassian
-    W = np.exp( -( abs(x-j)**exp + abs(y-i)**exp )/2/sigma**exp )
+    E = 6 #if this is 2, the weightning function is exactly guassian
+    # W = np.exp( -( abs(x-j)**E + abs(y-i)**E )/2/sigma**E )
+    W = sigma**E / ( (abs(x-j)**2 + abs(y-i)**2)**(E/2.0) + sigma**E )
 
     #the centroid, based on the modified guassian weightning
     i_bar,j_bar = (W*im*y).sum()/(W*im).sum(), (W*im*x).sum()/(W*im).sum() 
