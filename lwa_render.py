@@ -66,7 +66,7 @@ if __name__ == '__main__':
     fig = plt.figure( figsize=settings.renderer['figsize'] )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
     
-    if settings.renderer['deconvolution'].lower() != 'none':
+    if settings.renderer['deconvolution'].lower() in ['none', 'dirty+']:
         txtcolor = 'k'
     else:
         txtcolor = 'k'
@@ -172,7 +172,7 @@ if __name__ == '__main__':
             imMin = im.max()
 
         # add the instantaneous frame from the imager to the current frame
-        if settings.renderer['deconvolution'].lower() != 'none':
+        if settings.renderer['deconvolution'].lower() not in ['none', 'dirty+']:
             im[ np.log(im +1) < vmin ] = 0
             imFrame += im
             imSparkle += im
@@ -187,23 +187,27 @@ if __name__ == '__main__':
         # do we render the frame yet?
         if i%settings.renderer['frameintegration'] == 0:
             # this actually displays the frame
-            if settings.renderer['deconvolution'].lower() != 'none':
+            if settings.renderer['deconvolution'].lower() not in ['none', 'dirty+']:
                 ret = plt.imshow( np.log( imFrame.T +1 ), extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )
-            else:
+            elif settings.renderer['deconvolution'].lower() == 'none':
                 #linearize the max
                 mx = np.exp( sparklemax ) -1
                 print( im.max(), mx )
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
-                # im2 = np.log( imFrame +1 ) 
-                # print( im2.max() )
-                # im2[ im2< vmin ] = np.nan
-                # ret2 = plt.imshow( im2, extent=settings.bbox.flatten(), origin='lower', 
-                #     interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )                
+            elif settings.renderer['deconvolution'].lower() == 'dirty+':
+                im[im<im.max()/10] = 0
+                im = im **.5
+                #linearize the max
+                mx = sparklemax
+                print( im.max(), mx )
+                ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
+                    interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
+
 
             # Sparkles
-            if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
+            if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() not in ['none', 'dirty+']:
                 # imSparkle[ imSparkle > 0 ] = 1
                 im = np.log( imSparkle +1 )
                 # imSparkle /= settings.renderer['sparklemax']
@@ -244,7 +248,7 @@ if __name__ == '__main__':
             # remove the changing stuff
             ret.remove()
             txt.remove()
-            if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() != 'none':
+            if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() not in ['none', 'dirty+']:
                 ret2.remove()
         
             # now that we've plotted stuff, reset the frame (unless we don't)
