@@ -45,10 +45,7 @@ if __name__ == '__main__':
     # load the configuration
     settings = lwai.read_config(configPath)
 
-    # how big is the output?
-
-
-    # load the output data   
+    # load the dirty image data   
     inputFile = h5py.File( settings.dirtypath, 'r' )
     
     frames = inputFile[ 'dirty' ]
