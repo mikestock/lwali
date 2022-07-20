@@ -251,31 +251,36 @@ if __name__ == '__main__':
     NImage  = settings.imagesize
     ###
     # I've tried a couple of data types, float16 saturates, as does int16
-    outputFile = h5py.File( settings.dirtypath, mode='w' )
-    outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
-    #store settings information in here
-    outputFile.attrs['samplerate']  = settings.samplerate
-    outputFile.attrs['bandwidth']   = settings.bandwidth
-    outputFile.attrs['startsample'] = settings.startsample
-    outputFile.attrs['stopsample']  = settings.stopsample
-    outputFile.attrs['inttime']     = settings.inttime
-    outputFile.attrs['steptime']    = settings.steptime
-    outputFile.attrs['interpolation'] = settings.interpolation
-    outputFile.attrs['whiten']      = settings.whiten
-    ###
-    # If the number of stands is too big, these guys won't actually fit in an attribute
-    # TODO - fix this
-    if len( loc ) < 32:
-        outputFile.attrs['stands']      = settings.antennas['stands']
-        outputFile.attrs['standlocs']   = loc
-        outputFile.attrs['ang']         = ang
-        outputFile.attrs['bls']         = bls
-        outputFile.attrs['dls']         = dls
+    if settings.resume and os.path.exists( settings.dirtypath ):
+        outputFile = h5py.File( settings.dirtypath, mode='a' )
+        outputDset = outputFile['dirty']
+        specDset   = outputFile['spec']
+    else:
+        outputFile = h5py.File( settings.dirtypath, mode='w' )
+        outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
+        #store settings information in here
+        outputFile.attrs['samplerate']  = settings.samplerate
+        outputFile.attrs['bandwidth']   = settings.bandwidth
+        outputFile.attrs['startsample'] = settings.startsample
+        outputFile.attrs['stopsample']  = settings.stopsample
+        outputFile.attrs['inttime']     = settings.inttime
+        outputFile.attrs['steptime']    = settings.steptime
+        outputFile.attrs['interpolation'] = settings.interpolation
+        outputFile.attrs['whiten']      = settings.whiten
+        ###
+        # If the number of stands is too big, these guys won't actually fit in an attribute
+        # TODO - fix this
+        if len( loc ) < 32:
+            outputFile.attrs['stands']      = settings.antennas['stands']
+            outputFile.attrs['standlocs']   = loc
+            outputFile.attrs['ang']         = ang
+            outputFile.attrs['bls']         = bls
+            outputFile.attrs['dls']         = dls
 
-    #these are about the actual resultant image
-    outputDset.attrs['imagesize']   = settings.imagesize
-    outputDset.attrs['bbox']        = settings.bbox
-    specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
+        #these are about the actual resultant image
+        outputDset.attrs['imagesize']   = settings.imagesize
+        outputDset.attrs['bbox']        = settings.bbox
+        specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
     # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
     s = NFrames*NImage*NImage*2/1024/1024
@@ -288,6 +293,11 @@ if __name__ == '__main__':
     iSample = settings.startsample
     iFrame  = 0
     while iSample + settings.steptime < settings.stopsample:
+        if settings.resume:
+            if outputDset[iFrame].max() > 0:
+                iFrame += 1
+                iSample += settings.steptime 
+                continue
 
         ###
         # Get Data
