@@ -57,6 +57,53 @@ def centroid( im, sigma=None ):
 
     return i_bar, j_bar, resid
 
+def quadmax( im ):
+    #sigma in pixels
+    i,j = np.unravel_index( im.argmax(), im.shape )
+    
+    #do the i max
+    y = im[:,j]
+    x = np.arange( im.shape[1] )
+    i_ = i-1
+
+    #handle some edge cases, and get a mask of 
+    #the 3 points around the max
+    ii = i
+    if i <= 0: ii = 1
+    if i >= len(y)-1: ii = len(y)-2
+    m = [ii-1,ii,ii+1]
+
+    #get a fit, 
+    #we don't have to use polytit here, but it's convenient
+    p = np.polyfit( x[m], y[m], 2 )
+    #find the max of the fit, done by setting the dirivative to 0
+    i_ = -p[1]/p[0]/2
+
+    if not i_ > 0:
+        print ('wtf, polyfit borked' )
+    #last step is to evaluate the parabolic fit to get the max brightness
+    ai = p[0]*i_**2 + p[1]*i_ + p[2] 
+
+
+    #do the j max
+    y = im[i,:]
+    x = np.arange( im.shape[0] )
+
+    jj = j
+    if j <= 0: jj = 1
+    if j >= len(y)-1: jj = len(y)-2
+    m = [jj-1,jj,jj+1]
+    p = np.polyfit( x[m], y[m], 2 )
+    j_ = -p[1]/p[0]/2
+
+    if not j_ > 0:
+        print ('wtf, polyfit borked' )
+    #last step is to evaluate the parabolic fit to get the max brightness
+    aj = p[0]*j_**2 + p[1]*j_ + p[2]  
+    
+    return i_,j_, (ai+aj)/2, np.std( im )
+
+
 def index2cosab( i,j, frames ):
     N    = frames.attrs['imagesize']
     bbox = frames.attrs['bbox']
@@ -132,7 +179,11 @@ if __name__ == '__main__':
     
     while iFrame < NFrames:
         iSample = iFrame*settings.steptime + settings.startsample
-        tSample = iSample/settings.samplerate*1000    #in ms
+        tSample = iSample/settings.samplerate*1000    #in m
+
+        # if tSample < 75: 
+        #     iFrame += 1
+        #     continue
 
         frame = frames[iFrame]
 
@@ -140,12 +191,18 @@ if __name__ == '__main__':
             iFrame += 1
             continue
 
+
         #get the centroid location of the peak brightness of this frame (in indices)
         #r is the mean residual amplitude
-        i,j,r = centroid( frame, sigma=sigma )
+        # i,j,r = centroid( frame, sigma=sigma )
+        i,j,brightness, r = quadmax( frame )
         ca,cb = index2cosab( i,j, frames )
         #get the amplitude of this point.  We could interpolate this, but I'm not going to bother
         brightness = frame.max() 
+        # print( brightness/frame.max())
+
+        # if brightness > 100000: 
+        #     break
 
         # mx = abs(frame).max()
         # ret = plt.imshow( frame.T, extent=settings.bbox.flatten(), origin='lower', 
@@ -165,8 +222,8 @@ if __name__ == '__main__':
         #set the output
         outputDset[ iFrame ] = tSample, ca, cb, brightness, r
 
-        if iFrame%1000 == 0:
-            print (tSample )
+        if iFrame%100 == 0:
+            print ( '%1.7f %10i'%(tSample, brightness) )
             plt.cla()
             im = np.histogram2d( outputDset[:,1], outputDset[:,2], weights=outputDset[:,3], bins=1000, range=[[-1,1],[-1,1]] )
             plt.imshow( im[0]**.25, origin='lower', extent=[-1,1,-1,1]  )
