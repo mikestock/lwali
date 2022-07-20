@@ -64,5 +64,5 @@ if __name__ == '__main__':
         plt.plot( x,y, txtcolor+'-', alpha=0.2, lw=1 )
 
     im = np.histogram2d( centroids[:,1], centroids[:,2], weights=centroids[:,3], bins=1000, range=[[-1,1],[-1,1]] )
-    plt.imshow( im[0]**.25, origin='lower', extent=[-1,1,-1,1], vmin=0, cmap=cmap  )
+    plt.imshow( im[0].T**.25, origin='lower', extent=[-1,1,-1,1], vmin=0, cmap=cmap  )
     plt.pause(.1 )

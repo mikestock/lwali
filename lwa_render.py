@@ -9,10 +9,22 @@ import  os  #general purpose
 import lwa_image as lwai #config reading
 import lwa_imager as imager
 import sys
+from matplotlib.colors import LinearSegmentedColormap
 
 ####
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
+
+###
+# create a colormap which is all black, and just maps transparency
+cdict = { 
+            'red'  : [(0,0,0),(1,0,0)],
+            'green': [(0,0,0),(1,0,0)],
+            'blue' : [(0,0,0),(1,0,0)],
+            'alpha': [(0,0,0),(1,1,1)]
+}
+cmap = LinearSegmentedColormap( 'cmap', segmentdata=cdict, N=256)
+txtcolor = 'k'  #sets the color of text, and line segments
 
 def clean( im, psf, iterations=10, factor=0.75 ):
     output = np.zeros( im.shape )
@@ -121,6 +133,10 @@ if __name__ == '__main__':
         # normalize
         psf/=psf.max()
 
+    if settings.renderer['plotcentroids']:
+        centroidFile = h5py.File( settings.centroidpath, 'r' )
+        centroids = centroidFile['centroids']
+
     # integrations
     imInt = np.zeros( (NImage, NImage) )
     
@@ -134,6 +150,7 @@ if __name__ == '__main__':
     vmax = settings.renderer['vmax']
     vmin = settings.renderer['vmin']
     sparklemax = settings.renderer['sparklemax']
+    lastCentroid = 0
     while i < NFrames:
         iSample = i*settings.steptime + settings.startsample
         if iSample < settings.renderer['startrender'] and not settings.renderer['videointegration']:
@@ -202,7 +219,6 @@ if __name__ == '__main__':
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
 
-
             # Sparkles
             if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() not in ['none', 'dirty+']:
                 # imSparkle[ imSparkle > 0 ] = 1
@@ -211,6 +227,15 @@ if __name__ == '__main__':
                 im[ im == 0 ] = np.nan
                 ret2 = plt.imshow( im.T , extent=settings.bbox.flatten(), origin='lower', 
                     interpolation='None', vmin=vmin, vmax=sparklemax, cmap=settings.renderer['sparklecmap'] )
+
+            #Centroids
+            if settings.renderer['plotcentroids']:
+                tSample = iSample/settings.samplerate*1000    #in ms
+                if tSample-lastCentroid > 0.05:
+                    m = centroids[:,0] < tSample 
+                    im2 = np.histogram2d( centroids[m,1], centroids[m,2], weights=centroids[m,3], bins=1000, range=[[-1,1],[-1,1]] )
+                    lastCentroid = tSample
+                ret3 = plt.imshow( im2[0].T**.25, origin='lower', extent=[-1,1,-1,1], vmin=0, cmap=cmap  )
 
 
             # Add some text with the time in the corner
@@ -247,6 +272,8 @@ if __name__ == '__main__':
             txt.remove()
             if settings.renderer['sparkle'] and settings.renderer['deconvolution'].lower() not in ['none', 'dirty+']:
                 ret2.remove()
+            if settings.renderer['plotcentroids']:
+                ret3.remove()
         
             # now that we've plotted stuff, reset the frame (unless we don't)
             if not settings.renderer['videointegration']:
