@@ -165,13 +165,15 @@ if __name__ == '__main__':
                 maxFrequency = f
     #this will be in image plane units
     #nominal array diameter is 100 meters
-    sigma = 2*settings.speedoflight/maxFrequency / 100
+    # sigma = settings.speedoflight/maxFrequency / 100
 
-    #convert to pixels
-    dca = (frames.attrs['bbox'][0][1]-frames.attrs['bbox'][0][0])/frames.attrs['imagesize']
-    print ( 'sigma',sigma, dca )
-    sigma /= dca
-    print ( 'sigma',sigma )
+    # #convert to pixels
+    # dca = (frames.attrs['bbox'][0][1]-frames.attrs['bbox'][0][0])/frames.attrs['imagesize']
+    # print ( 'sigma',sigma, dca )
+    # sigma /= dca
+    # print ( 'sigma',sigma )
+
+    sigma = 7.5
 
     ######
     # Main loop, loop until we run out of frames from the imager
