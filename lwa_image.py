@@ -292,6 +292,11 @@ if __name__ == '__main__':
     print ('Main Loop')
     iSample = settings.startsample
     iFrame  = 0
+    if settings.resumesample > settings.startsample:
+        #we could do this without the loop, but meh
+        while iSample < settings.resumesample:
+            iSample += settings.steptime
+            iFrame  += 1
     while iSample + settings.steptime < settings.stopsample:
         if settings.resume:
             if outputDset[iFrame].max() > 0:
