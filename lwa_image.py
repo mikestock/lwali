@@ -246,16 +246,18 @@ if __name__ == '__main__':
     print ('Found %i antennas, with maximum baseline %0.2f m'%(M, bls.max()))
 
     print ('**** ****')
-    print ('Initializing Output')
     NFrames = (settings.stopsample-settings.startsample)//settings.steptime
     NImage  = settings.imagesize
     ###
     # I've tried a couple of data types, float16 saturates, as does int16
     if settings.resume and os.path.exists( settings.dirtypath ):
+
+        print ('Appending to Output')
         outputFile = h5py.File( settings.dirtypath, mode='a' )
         outputDset = outputFile['dirty']
         specDset   = outputFile['spec']
     else:
+        print ('Initializing Output')
         outputFile = h5py.File( settings.dirtypath, mode='w' )
         outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
         #store settings information in here
