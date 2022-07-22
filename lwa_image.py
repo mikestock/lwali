@@ -355,9 +355,8 @@ if __name__ == '__main__':
         ###
         # Correlate
         xcs  = np.zeros( [len(antennaPairs), I*P*2], dtype='float32' ) #store the xcross correlations in an array
-
         ffts = np.zeros( (M,2*I), dtype='complex64' )
-        spec = np.zeros( 2*I, dtype='float32' )
+
         for i in range(M):
             ffti = np.fft.fft( data[i], 2*I )
             if settings.whiten:
@@ -369,7 +368,8 @@ if __name__ == '__main__':
                 # the image amplitude about the same
                 ffti = ffti/abs( ffti )*p/len(ffti)
             ffts[i] = ffti
-            spec += abs( ffti ) / M
+        
+        spec = abs( ffts ).mean( axis=0 )
 
         # loop over antenna pairs
         k = 0   #location in xcs
