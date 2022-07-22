@@ -9,6 +9,7 @@ import configparser, ast    #both used to read the configuration
 import os, sys, time    #libraries I just tend to use
 # the imager is a C library that does the imaging
 import lwa_imager as imager
+from threading import Thread
 
 ####
 # GLOBALS
@@ -28,6 +29,32 @@ class Settings( object ):
 
         #use all antennas, with X polarity
         self.antennas = { 'stands': range(1,257), 'polarity':0 }
+
+class DataWriter( Thread ):
+    """
+    This class is to allow asynchronous writing of data to disk, 
+    since these writes can take a while, but don't really need 
+    to happen right away
+
+    Threading in python isn't the same as multiprocessing, but 
+    it's good for things like this.
+    """
+    def __init__(self, dset):
+        Thread.__init__(self)
+        self.dset    = dset
+        self.queue   = []
+        self.running = True 
+    
+    def run( self ):
+        while True:
+            if not self.running:
+                break
+
+            while len( self.queue ) > 0:
+                iFrame, im = self.queue.pop()
+                self.dset[iFrame] = im
+            
+            time.sleep( 0.1 )
 
 def read_config( configPath=CONFIG_PATH ):
     conf = configparser.ConfigParser()
@@ -288,6 +315,9 @@ if __name__ == '__main__':
     s = NFrames*NImage*NImage*2/1024/1024
     print ('Creating %s, sized %i MB'%(settings.dirtypath, s) )
 
+    specWriter = DataWriter( specDset )
+    frameWriter = DataWriter( outputDset )
+
     ######
     # main loop
     print ('**** ****')
@@ -340,7 +370,6 @@ if __name__ == '__main__':
                 ffti = ffti/abs( ffti )*p/len(ffti)
             ffts[i] = ffti
             spec += abs( ffti ) / M
-        specDset[iFrame] = spec    
 
         # loop over antenna pairs
         k = 0   #location in xcs
@@ -369,7 +398,10 @@ if __name__ == '__main__':
 
         ###
         # Save to Output
-        outputDset[iFrame] = im
+        frameWriter.queue.append( (iFrame,im) )
+        specWriter.queue.append( (iFrame,im) )
+        # outputDset[iFrame] = im
+        # specDset[iFrame] = spec  
 
         # Some output printing, so that I know something is happening
         print( '  %10i %1.6f %i %0.1f'%(iSample, iSample/settings.samplerate, dMax, im.max()/5))
