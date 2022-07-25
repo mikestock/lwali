@@ -329,6 +329,7 @@ if __name__ == '__main__':
         while iSample < settings.resumesample:
             iSample += settings.steptime
             iFrame  += 1
+
     while iSample + settings.steptime < settings.stopsample:
         if settings.resume:
             if outputDset[iFrame].max() > 0:
@@ -362,6 +363,7 @@ if __name__ == '__main__':
             if settings.whiten:
                 # TODO - not clear that this will works, since some of the 
                 #        frequency bins (should) have 0 power in them.
+                #        There is evidence that turning on whitening breaks things
                 # what is the mean rms amplitude of the current spectra?
                 p = abs(ffti).sum().real
                 # normalize the FFT (whiten) with some scaling to keep 
@@ -370,6 +372,7 @@ if __name__ == '__main__':
             ffts[i] = ffti
         
         spec = abs( ffts ).mean( axis=0 )
+
 
         # loop over antenna pairs
         k = 0   #location in xcs
