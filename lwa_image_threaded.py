@@ -30,31 +30,50 @@ class Settings( object ):
         #use all antennas, with X polarity
         self.antennas = { 'stands': range(1,257), 'polarity':0 }
 
-class DataWriter( Thread ):
-    """
-    This class is to allow asynchronous writing of data to disk, 
-    since these writes can take a while, but don't really need 
-    to happen right away
-
-    Threading in python isn't the same as multiprocessing, but 
-    it's good for things like this.
-    """
-    def __init__(self, dset):
+class Processor( Thread) :
+    def __init__( self, settings, bls, dls, ang ):
         Thread.__init__(self)
-        self.dset    = dset
-        self.queue   = []
-        self.running = True 
+        self.settings = settings
+        self.bls = bls
+        self.dls = dls
+        self.ang = ang
+        self.queue = []
+        self.running = True
     
     def run( self ):
         while True:
             if not self.running:
-                break
+                return
 
-            while len( self.queue ) > 0:
-                iFrame, im = self.queue.pop()
-                self.dset[iFrame] = im
-            
-            time.sleep( 0.1 )
+            if len(self.queue) == 0:
+                time.sleep( 0.1 )
+                continue
+
+            hdfFile = h5py.File( settings.dirtypath, 'a' )
+            for i in range(10):
+                if len( self.queue ) == 0: 
+                    break
+                iFrame, xcs = self.queue.pop(0)
+                #is this frame already processed?
+                if settings.resume:
+                    S =abs(hdfFile['dirty'][iFrame]).sum() 
+                    if S > 0:
+                        #yeah, this one is done
+                        print ('skipping %i - %i'%(iFrame,S))
+                        continue
+                im = self.image( xcs )
+                hdfFile['dirty'][iFrame] = im
+            print ('closing')
+            hdfFile.close()
+    
+    def image( self, xcs ):
+        im = imager.pimage( xcs, self.bls, self.dls, self.ang, 
+            N=self.settings.imagesize, fs=self.settings.samplerate/1e6*P,
+            bbox=self.settings.bbox, C=self.settings.speedoflight/1e6 )
+        return im
+
+    def add( self, iFrame, xcs ):
+        self.queue.append ( (iFrame, xcs) )
 
 def read_config( configPath=CONFIG_PATH ):
     conf = configparser.ConfigParser()
@@ -95,9 +114,14 @@ def read_config( configPath=CONFIG_PATH ):
             val = ast.literal_eval( val )
             # special cases
             if key == 'stands' and val == 'all':
-                val = range( 1,257 )
+                val = list(range( 1,257 ))
             # no nparrays for the antennas, these are just lists
             antennas[key] = val
+        if 'excludestands' in antennas:
+            for standnum in antennas['excludestands']:
+                if standnum in antennas['stands']:
+                    antennas['stands'].remove( standnum )
+        print (antennas['stands'] )
         settings.antennas = antennas
 
     # return the settings object
@@ -230,6 +254,9 @@ if __name__ == '__main__':
 
             D = np.sqrt( (iX-jX)**2 + (iY-jY)**2 )
             if D < settings.minbaseline: continue
+            if D > settings.maxbaseline: 
+                print ('%i-%i = %2.1f exceeds max baseline'%(i,j,D))
+                continue
 
             # because we don't store all the baseline pairs, 
             # we need to store the ones we do
@@ -282,11 +309,11 @@ if __name__ == '__main__':
         print ('Appending to Output')
         outputFile = h5py.File( settings.dirtypath, mode='a' )
         outputDset = outputFile['dirty']
-        specDset   = outputFile['spec']
+        # specDset   = outputFile['spec']
     else:
         print ('Initializing Output')
         outputFile = h5py.File( settings.dirtypath, mode='w' )
-        outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
+        outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32', compression='gzip')
         #store settings information in here
         outputFile.attrs['samplerate']  = settings.samplerate
         outputFile.attrs['bandwidth']   = settings.bandwidth
@@ -309,7 +336,7 @@ if __name__ == '__main__':
         #these are about the actual resultant image
         outputDset.attrs['imagesize']   = settings.imagesize
         outputDset.attrs['bbox']        = settings.bbox
-        specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
+        # specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
     # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
     s = NFrames*NImage*NImage*2/1024/1024
@@ -326,13 +353,24 @@ if __name__ == '__main__':
         while iSample < settings.resumesample:
             iSample += settings.steptime
             iFrame  += 1
-
-    while iSample + settings.steptime < settings.stopsample:
-        if settings.resume:
-            if outputDset[iFrame].max() > 0:
+    if settings.resume:
+        while iSample + settings.steptime < settings.stopsample:
+            if abs(outputDset[iFrame]).sum() != 0:
                 iFrame += 1
                 iSample += settings.steptime 
                 continue
+            else: break
+    
+    outputFile.close()
+
+    processor = Processor( settings, bls, dls, ang )
+    processor.start()
+    while iSample + settings.steptime < settings.stopsample:
+        # if settings.resume:
+        #     if outputDset[iFrame].max() > 0:
+        #         iFrame += 1
+        #         iSample += settings.steptime 
+        #         continue
 
         ###
         # Get Data
@@ -368,7 +406,7 @@ if __name__ == '__main__':
                 ffti = ffti/abs( ffti )*p/len(ffti)
             ffts[i] = ffti
         
-        spec = abs( ffts ).mean( axis=0 )
+        # spec = abs( ffts ).mean( axis=0 )
 
 
         # loop over antenna pairs
@@ -387,25 +425,27 @@ if __name__ == '__main__':
 
         ###
         # Image
-        if settings.azel:
-            im = imager.pimage_azel( xcs, bls, dls, ang, 
-                N=settings.imagesize, fs=settings.samplerate/1e6*P,
-                bbox=settings.bbox, C=settings.speedoflight/1e6 )
-        else:
-            im = imager.pimage( xcs, bls, dls, ang, 
-                N=settings.imagesize, fs=settings.samplerate/1e6*P,
-                bbox=settings.bbox, C=settings.speedoflight/1e6 )
+        # if settings.azel:
+        #     im = imager.pimage_azel( xcs, bls, dls, ang, 
+        #         N=settings.imagesize, fs=settings.samplerate/1e6*P,
+        #         bbox=settings.bbox, C=settings.speedoflight/1e6 )
+        # else:
+        #     im = imager.pimage( xcs, bls, dls, ang, 
+        #         N=settings.imagesize, fs=settings.samplerate/1e6*P,
+        #         bbox=settings.bbox, C=settings.speedoflight/1e6 )
+
+        while len( processor.queue ) > 10:
+            time.sleep( 0.1 )
+        processor.add( iFrame, xcs)
 
         ###
         # Save to Output
-        outputDset[iFrame] = im
-        specDset[iFrame] = spec  
+        # outputDset[iFrame] = im
+        # specDset[iFrame] = spec  
 
         # Some output printing, so that I know something is happening
-        print( '  %10i %1.6f %i %0.1f'%(iSample, iSample/settings.samplerate, dMax, im.max()/5))
+        print( '  %10i %10i %1.6f %i'%(iSample, iFrame, iSample/settings.samplerate*1000, dMax ))
 
         # increment counters,
         iFrame += 1
         iSample += settings.steptime
-
-    outputFile.close()

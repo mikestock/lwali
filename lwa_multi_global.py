@@ -10,6 +10,7 @@ import  os  #general purpose
 import lwa_image as lwai #config reading
 import lwa_imager as imager
 import sys
+from scipy import optimize
 
 plt.ion()
 
@@ -111,6 +112,18 @@ def index2cosab( i,j, frames ):
     cosb = (bbox[1,1]-bbox[1,0])*(j+.5)/N+bbox[1,0]
     return cosa, cosb
 
+def minfn( guess, im, sigma=5 ):
+    y,x = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
+    resid = im.copy()
+    i = 0
+    while i < len(guess):
+        x0,y0,amp = guess[i:i+3] 
+        i += 3
+        resid -= amp * np.exp( - ( (x-x0)**2 + (y-y0)**2 )/(2*sigma**2) )
+    
+    # return np.std(resid)
+    return abs( resid.max() )
+
 if __name__ == '__main__':
 
     # load the configuration.  This can be passed as an option, so 
@@ -171,57 +184,78 @@ if __name__ == '__main__':
         iSample = iFrame*settings.steptime + settings.startsample
         tSample = iSample/settings.samplerate*1000    #in m
 
-        # if tSample < 75: 
-        #     iFrame += 1
-        #     continue
-
         frame = frames[iFrame]
 
-        # if frame.max() == 0:
-        #     print (iFrame, '0 amp')
-        #     iFrame += 1
-        #     skipCount += 1
-        #     if skipCount > 20: break
-        #     continue
+        if frame.max() == 0:
+            print (iFrame, '0 amp')
+            iFrame += 1
+            skipCount += 1
+            if skipCount > 20: break
+            continue
 
         skipCount = 0
 
         im = frame.copy()   #we copy the frame so we can remove stuff from it
-        thresh = 5*np.std(  im )
+        thresh = 5*np.std( im )
         brightness = 0
-        x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
 
         #get the centroid location of the peak brightness of this frame (in indices)
         #r is the mean residual amplitude
         # i,j,r = centroid( frame, sigma=sigma )
         iCentroids = 0
-        while im.max() > thresh and iCentroids < 50:
-            iCentroids += 1
-            thresh = 6*np.std( im )
-            # print (im.max(), frame.max())
-            i,j,brightness, r = quadmax( im )
-            if i is None: break
-            ca,cb = index2cosab( i,j, frames )
-            if ca**2 + cb**2 > 1:
-                #we're outside the horizon
-                print ('invalid centroid')
-                break
-            #get the amplitude of this point.  We could interpolate this, but I'm not going to bother
-            brightness = im.max() 
+        initGuess= [[0,im.shape[0]],[0,im.shape[1]],[0,im.max()]]
+        frameCentroids = []
+        resid = im.max()
+        # if im.max() > thresh:
+        #     sol = optimize.differential_evolution( minfn,initGuess*iCentroids, args=(im,sigma,) )
+        #     i_s  = sol.x[::3]
+        #     j_s  = sol.x[1::3]
+        #     amps = sol.x[2::3]        
+        #     frameCentroids = []
+        #     for ii in range( iCentroids ):
+        #         i = i_s[ii]
+        #         j = j_s[ii]
+        #         a = amps[ii]
+        #         #only keep the bright stuff
+        #         if a/amps.max() < 0.1: continue
+        #         ca,cb = index2cosab( i,j, frames )
+
+        #         frameCentroids.append( [tSample, ca, cb, a, 0] )
+
+        #     centroids += frameCentroids
+
+
+        while resid > thresh and iCentroids < 3:
             
-            centroids.append( [tSample, ca, cb, brightness, r] )
+            iCentroids += 1
 
-            #remove this centroid from the image
-            peak = im.max() * np.exp( - ( (x-j)**2 + (y-i)**2 )/(2*sigma**2) )
-            im -= peak
+            sol = optimize.differential_evolution( minfn,initGuess*iCentroids, args=(im,sigma,) )
+            i_s  = sol.x[::3]
+            j_s  = sol.x[1::3]
+            amps = sol.x[2::3]
+            r = minfn( sol.x,im,sigma ) 
+            if r/resid > 0.8: break
+            resid = r
+            
+            frameCentroids = []
+            for ii in range( iCentroids ):
+                i = i_s[ii]
+                j = j_s[ii]
+                a = amps[ii]
 
-        if iCentroids > 1:
-            print ('%i, %i'%(iSample,iCentroids))
-        if tSample > 14.0014648 and brightness == 0:
-            sys.exit()
-        if iCentroids >= 2:
-            sys.exit()
-            print ('***', iSample, iCentroids)
+                ca,cb = index2cosab( i,j, frames )
+
+                frameCentroids.append( [tSample, ca, cb, a, 0] )
+
+        centroids += frameCentroids
+
+        # if iCentroids > 1:
+        #     print ('%i, %i'%(iSample,iCentroids))
+        # if tSample > 14.0014648 and brightness == 0:
+        #     sys.exit()
+        # if iCentroids >= 5:
+        #     sys.exit()
+        #     print ('***', iSample, iCentroids)
         # if brightness > 100000: 
         #     break
 
@@ -243,12 +277,13 @@ if __name__ == '__main__':
         #set the output
         
 
-        if iFrame%100 == 0 and len(centroids) > 0:
+        if iFrame%10 == 0 and len(centroids) > 0:
             print ( '%1.7f %10i'%(tSample, brightness) )
             plt.cla()
             d = np.array( centroids )
-            im = np.histogram2d( d[:,1], d[:,2], weights=d[:,3], bins=1000, range=[[-1,1],[-1,1]] )
-            plt.imshow( im[0]**.25, origin='lower', extent=[-1,1,-1,1]  )
+            bbox = frames.attrs['bbox']
+            im = np.histogram2d( d[:,1], d[:,2], weights=d[:,3], bins=100, range=bbox )
+            plt.imshow( im[0]**.25, origin='lower', extent=np.array( bbox ).flatten()  )
             plt.pause(.1 )
 
 

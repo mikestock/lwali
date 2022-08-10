@@ -14,13 +14,18 @@ import matplotlib.pyplot as plt
 plt.ion()
 
 configPath = 'lwa_image.cfg'
+configPath = '../20220523_LWA_paper/lwa_image_flash03_NL.cfg'
 settings = read_config(configPath=configPath)
 inputFile = h5py.File( settings.timeseriespath, 'r' )
 
+# settings.imagecenter = -0.744, -0.619
+
 # iSample = 35392000
 iSample = 39720800
+iSample = 39820800
+iSample = 15490000  #early in flash
 figsize = 6,6
-
+settings.inttime = 200
 
 def clean( im, psf, iterations=10, factor=0.75 ):
     output = np.zeros( im.shape )
@@ -193,15 +198,13 @@ for i,j in antennaPairs:
 
 ###
 # Image
-sys.exit()
-
 im = imager.pimage( xcs, bls, dls, ang, 
     N=settings.imagesize, fs=settings.samplerate/1e6*P,
     bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
-im = imager.image( xcs, bls, dls, ang, 
-    N=settings.imagesize, fs=settings.samplerate/1e6*P,
-    bbox=settings.bbox, C=settings.speedoflight/1e6 )
+# im = imager.image( xcs, bls, dls, ang, 
+#     N=settings.imagesize, fs=settings.samplerate/1e6*P,
+#     bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
 fig = plt.figure( figsize=figsize )
 fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
@@ -232,7 +235,7 @@ mx = im.max()
 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )     
 
-
+sys.exit()
 
 ###
 # Deconvolution

@@ -44,6 +44,7 @@ if __name__ == '__main__' :
             #loop over (unordered) list of files
             combinedSpec = {}
             triggerTime  = 0
+            channelCount = {}
             for inputPath in args.input_paths:
 
                 ###
@@ -90,9 +91,18 @@ if __name__ == '__main__' :
                             continue
 
                         combinedSpec[specTime][first_chan:first_chan+12] = cFrame.payload.data[:,iStand,iPol]
+                        if not specTime in channelCount:
+                            channelCount[specTime] = 0
+                        channelCount[specTime] += 12
                     
                     if fileEnd: break
 
+            countMin = 1000000
+            countMax = 0
+            for k in channelCount:
+                if channelCount[k] > countMax: countMax = channelCount[k]
+                if channelCount[k] < countMin: countMin = channelCount[k]
+            print( 'Data read from %i/%i total frequency channels'%(countMin,countMax))
             #convert to timeseries
             print( 'Spliting frames into continuous time series')
             nSamples = len( combinedSpec ) * totalChannels*2   #we'll have this many samples in each one
