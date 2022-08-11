@@ -57,10 +57,11 @@ def centroid( im, sigma=None ):
 
     return i_bar, j_bar, resid
 
-def quadmax( im ):
+def quadmax( im, sigma ):
     #sigma in pixels
     i,j = np.unravel_index( im.argmax(), im.shape )
-    
+    brightness = im[i,j]
+
     #do the i max
     y = im[:,j]
     x = np.arange( im.shape[1] )
@@ -102,7 +103,10 @@ def quadmax( im ):
     #last step is to evaluate the parabolic fit to get the max brightness
     aj = p[0]*j_**2 + p[1]*j_ + p[2]  
     
-    return i_,j_, (ai+aj)/2, np.std( im )
+    x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
+    peak = im.max() * np.exp( - ( (x-j)**2 + (y-i)**2 )/(2*sigma**2) )
+
+    return i_,j_, brightness, im-peak
 
 def index2cosab( i,j, frames ):
     N    = frames.attrs['imagesize']
@@ -152,7 +156,7 @@ if __name__ == '__main__':
                 maxFrequency = f
     #this will be in image plane units
     #nominal array diameter is 100 meters
-    sigma = settings.speedoflight/maxFrequency / 111
+    sigma = settings.speedoflight/maxFrequency / 161
 
     #convert to pixels
     dca = (frames.attrs['bbox'][0][1]-frames.attrs['bbox'][0][0])/frames.attrs['imagesize']
@@ -195,19 +199,25 @@ if __name__ == '__main__':
         #r is the mean residual amplitude
         # i,j,r = centroid( frame, sigma=sigma )
         iCentroids = 0
-        while im.max() > thresh and iCentroids < 50:
+        while iCentroids < 10 and im.max() > frame.max()/30:
             iCentroids += 1
-            thresh = 6*np.std( im )
-            # print (im.max(), frame.max())
-            i,j,brightness, r = quadmax( im )
+
+            i,j,brightness, im = quadmax( im, sigma )
+            #did we get a solution?
             if i is None: break
+
+            #calculate residual and see if this is any good
+            r = np.std(im)
+            print( '%6i, %6i, %6i, %3.1f'% (iFrame, frame.max(), brightness, brightness/r) )
+            #is the result still in specification?
+            if brightness < 7*r: break
+
+            #convert to cosine projection
             ca,cb = index2cosab( i,j, frames )
             if ca**2 + cb**2 > 1:
                 #we're outside the horizon
                 print ('invalid centroid')
                 break
-            #get the amplitude of this point.  We could interpolate this, but I'm not going to bother
-            brightness = im.max() 
             
             centroids.append( [tSample, ca, cb, brightness, r] )
 
@@ -215,13 +225,14 @@ if __name__ == '__main__':
             peak = im.max() * np.exp( - ( (x-j)**2 + (y-i)**2 )/(2*sigma**2) )
             im -= peak
 
-        if iCentroids > 1:
-            print ('%i, %i'%(iSample,iCentroids))
-        if tSample > 14.0014648 and brightness == 0:
-            sys.exit()
-        if iCentroids >= 2:
-            sys.exit()
-            print ('***', iSample, iCentroids)
+        # if iCentroids > 3:
+        #     print ('%i, %i'%(iSample,iCentroids))
+        # if tSample > 14.0014648 and brightness == 0:
+        #     sys.exit()
+        # if iCentroids >= 3 and cb > 0.17:
+        #     print ('***', iSample, iCentroids)
+        #     sys.exit()
+            
         # if brightness > 100000: 
         #     break
 
@@ -248,7 +259,7 @@ if __name__ == '__main__':
             plt.cla()
             d = np.array( centroids )
             im = np.histogram2d( d[:,1], d[:,2], weights=d[:,3], bins=1000, range=[[-1,1],[-1,1]] )
-            plt.imshow( im[0]**.25, origin='lower', extent=[-1,1,-1,1]  )
+            plt.imshow( im[0].T**.25, origin='lower', extent=[-1,1,-1,1]  )
             plt.pause(.1 )
 
 
