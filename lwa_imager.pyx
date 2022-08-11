@@ -29,34 +29,34 @@ def test( float[:] arr ):
     return Output
 
 
-###
-# for correlating
-cdef fpad( complex[:] X, int M):
-    """fpad(X,M)
-    Frequency 0 pads X to be M*len(X) long,
-    Used for fft based interpolation
-    input - 
-        X	-	fft of a signal, X(f)
-        M	-	factor to interpolate by
-    output -
-        padded output(f) 
-    """
+# ###
+# # for correlating
+# cdef fpad( complex[:] X, int M):
+#     """fpad(X,M)
+#     Frequency 0 pads X to be M*len(X) long,
+#     Used for fft based interpolation
+#     input - 
+#         X	-	fft of a signal, X(f)
+#         M	-	factor to interpolate by
+#     output -
+#         padded output(f) 
+#     """
 
-    if M  <= 1:
-        return X
-    N = len(X)
+#     if M  <= 1:
+#         return X
+#     N = len(X)
      
-    ###
-    # create the output array
-    output = np.zeros( N*M , dtype='complex')
-    #the first N/2 samples
-    output[:N//2] = X[:N//2]*M
-    output[N//2]  = X[N//2]/2*M
-    #the last N/2 samples
-    output[-N//2] = X[N//2]/2*M
-    output[-N//2+1:] = X[N//2+1:]*M
+#     ###
+#     # create the output array
+#     output = np.zeros( N*M , dtype='complex')
+#     #the first N/2 samples
+#     output[:N//2] = X[:N//2]*M
+#     output[N//2]  = X[N//2]/2*M
+#     #the last N/2 samples
+#     output[-N//2] = X[N//2]/2*M
+#     output[-N//2+1:] = X[N//2+1:]*M
      
-    return output
+#     return output
 
 ###
 # For imaging
