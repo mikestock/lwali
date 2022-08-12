@@ -222,6 +222,133 @@ def pimage( float[:,:] xc,
     
     return Output
 
+def wimage( float[:,:] xc, 
+            float[:] bl, 
+            float[:] dl,
+            float[:,:] A, 
+            float[:] wsp,
+            int N=50, 
+            float fs=200,
+            float[:,:] bbox = np.array( [[-1.1,1.1],[-1.1,1.1]], dtype='float32' ),
+            float C=299.792458
+            ):
+
+    """
+    A parallel capable version of image.  
+    Inputs and outputs are identical to the non-parallel version, this one just melts CPUs faster
+    Performance gains depend on how many CPUs your system has, and if they're already in use
+    Parallel performance now actually better than single threaded performance!
+
+    Computes the image of the sky from M baselines
+    xc - cross correlations
+    bl - baseline lengths in meters
+    dl - extra delays (eg cable lengths) in ns
+    A  - baseline orientation matrix
+    N  - number of pixels for the image
+    fs - sampling frequency (after interpolation)
+    bbox - the edges of the image to be made, should be square
+    
+    image uses a projection based algorithm which is fast, to project 
+    the cross correlations onto the sky.  No non-linear corrections are 
+    applied (like distance to the source).  
+    
+    Uses quadratic interpolation to get sub-sample values of the 
+    cross correlations.  This is fast, but not exact.  Results will be 
+    exact if the cross correlations are heavily interpolated, at the 
+    expense of computation time.
+    """
+
+    cdef float cosa, cosb, tau, dtau, az, el
+
+    #these are used to calculate the amplitude of the pixel
+    cdef float p, l, a, W
+        
+    #counters, there's a bunch of them
+    cdef int i,j,k,m
+
+    cdef int j0,j1,j2   #for quadint
+
+    #int, corresponds to tau=0
+    #this wouldn't be 0 if we used fftshift on the cross correlations
+    cdef int  mMiddle = 0
+
+    #the size of the grid
+    cdef float dcosa = (bbox[0,1]-bbox[0,0])/N*.5
+    cdef float dcosb = (bbox[1,1]-bbox[1,0])/N*.5
+
+    #the shape of the xc array, not as python values
+    cdef int xcN = <int> xc.shape[0]
+    cdef int xcM = <int> xc.shape[1]
+
+    ###
+    # Generate the image array
+    # can't be empty since not all values will be calculated
+    cdef float pixelValue
+    cdef np.ndarray[float, ndim=2] Output = np.zeros( (N,N), dtype='float32' )
+    
+    ###
+    # Loop through the pixel
+    for i in prange(N, nogil=True):
+        cosa = (bbox[0,1]-bbox[0,0])*(i+.5)/N+bbox[0,0]	
+        for j in range(N):
+            cosb = (bbox[1,1]-bbox[1,0])*(j+.5)/N+bbox[1,0]
+
+            ###
+            # loop over the baselines
+            pixelValue = 0
+            W = 0
+            # for k in prange( xcN, nogil=True ):
+            for k in range( xcN ):
+                #the time delay for this location on this baseline (in us)
+                #the delay is in ns, everything else is in us
+                tau = (A[k,0]*cosa+A[k,1]*cosb)*bl[k]/C - dl[k]/1000
+                #convert to the time delay in samples
+                tau = tau*fs
+
+                #refernce from the 0 time of the array
+                tau = mMiddle-tau
+                
+                #convert to array numbered, there's a cython option 
+                #which would make this not needed
+                if tau < 0:
+                    tau = xcM+tau
+
+                #did we step out of the array on accident?
+                if tau < 0 or tau >= xcM:
+                    continue
+
+                ###
+                # This is the quadint portion of the code.
+                # it's been pulled out here to make the parellel stuff easier to work with 
+                j0 = <int> tau
+                #these are to index the array
+                #we generate them here so that the can wrap 
+                #properly if needed
+                j1 = j0+1 
+                j2 = j0+2
+                if j1 >= xcM:
+                    j1 = j1-xcM
+                if j2 >= xcM:
+                    j2 = j2-xcM
+                
+                # cdef float Output = 0, a
+                # #there are 3 terms
+                a = .5*(tau-j0-1)*(tau-j0-2)
+                pixelValue = pixelValue + a*xc[k,j0]*wsp[k]
+                a = -1*(tau-j0)*(tau-j0-2)
+                pixelValue = pixelValue + a*xc[k,j1]*wsp[k]
+                a = .5*(tau-j0)*(tau-j0-1)
+                pixelValue = pixelValue + a*xc[k,j2]*wsp[k]
+
+                W += wsp[k]
+                
+
+                #add this to the image (and normalize)
+                # pixelValue +=  quadint( xc,k, tau )
+            Output[i,j] = pixelValue/wsp[k]
+    
+    return Output
+
 
 
 def pimage_azel( float[:,:] xc, 
