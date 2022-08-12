@@ -9,12 +9,12 @@ import configparser, ast    #both used to read the configuration
 import os, sys, time    #libraries I just tend to use
 # the imager is a C library that does the imaging
 import lwa_imager as imager
-from lwa_image import *
+from lwa_image_threaded import *
 import matplotlib.pyplot as plt
 plt.ion()
 
 configPath = 'lwa_image.cfg'
-configPath = '../20220523_LWA_paper/lwa_image_flash03_NL.cfg'
+configPath = '../../Documents/20220523_LWA_paper/lwa_image_flash03_max.cfg'
 settings = read_config(configPath=configPath)
 inputFile = h5py.File( settings.timeseriespath, 'r' )
 
@@ -43,6 +43,10 @@ def clean( im, psf, iterations=10, factor=0.75 ):
     
     return output
 
+def generate_key( A, B, dx ):
+    A = A*180/np.pi
+    return int(A//dx), int(B//dx)
+
 ###
 # Some shorthand
 I = settings.inttime        #number of samples per integration window
@@ -63,6 +67,7 @@ loc  = np.zeros( [M,3] )
 ang  = np.zeros( [M*(M-1)//2, 2], dtype='float32' )     #baseline angles
 dls  = np.zeros( M*(M-1)//2, dtype='float32' )          #store the delays in an array
 bls  = np.zeros( M*(M-1)//2, dtype='float32' )          #store the baselines in an array
+wsp  = np.zeros( M*(M-1)//2, dtype='float32' )          #spatial weights for the image
 antennaPairs = []
 intdelays  = np.zeros( M, dtype='int' )          #integer sample delays for reading in the data
 #loop over antennas for the integer delays based on image center
@@ -85,6 +90,7 @@ for i in range( M ):
     intdelays[i] = -intTau
 
 # Loop over antenna pairs
+usedKeys = set()
 k = 0   #location in the arrays above
 for i in range(M):
     
@@ -105,6 +111,16 @@ for i in range(M):
         D = np.sqrt( (iX-jX)**2 + (iY-jY)**2 )
         if D < settings.minbaseline: continue
 
+        Ax = (iX-jX)/D
+        Ay = (iY-jY)/D
+
+        A = np.arctan2( Ax,Ay )
+        if A < 0: A += np.pi
+        # key = generate_key( A, D, 5 )
+        # if key in usedKeys:
+        #     continue
+        # usedKeys.add( key )
+
         # because we don't store all the baseline pairs, 
         # we need to store the ones we do
         antennaPairs.append( (i,j) )
@@ -115,8 +131,8 @@ for i in range(M):
         
         # what's the angle between the antennas?
         # this does not include z contribution
-        ang[k][0] = (iX-jX)/bls[k]
-        ang[k][1] = (iY-jY)/bls[k]
+        ang[k][0] = Ax
+        ang[k][1] = Ay
 
         # what's the delay difference
         # We've already handled the cable delays in the tbf conversion step
@@ -130,6 +146,19 @@ for i in range(M):
 ang = ang[:k]
 bls = bls[:k]
 dls = dls[:k]
+
+A = np.arctan2( ang[:,0], ang[:,1] )
+#there's a 180 degree ambiguity
+A[A<0] += np.pi
+weightDict = {}
+for k in range( len(bls) ):
+    key=generate_key( A[k], bls[k], 5 )
+    if not key in weightDict:
+        weightDict[key] = 0
+    weightDict[key] += 1
+for k in range( len(bls) ):
+    key=generate_key( A[k], bls[k], 5 )
+    wsp[k] = 1./weightDict[key]**.3
 
 ###
 # time weighting, to weight solution towards the center of the window
@@ -198,7 +227,11 @@ for i,j in antennaPairs:
 
 ###
 # Image
-im = imager.pimage( xcs, bls, dls, ang, 
+# im = imager.pimage( xcs, bls, dls, ang, 
+#     N=settings.imagesize, fs=settings.samplerate/1e6*P,
+#     bbox=settings.bbox, C=settings.speedoflight/1e6 )
+
+im = imager.wimage( xcs, bls, dls, ang, wsp,
     N=settings.imagesize, fs=settings.samplerate/1e6*P,
     bbox=settings.bbox, C=settings.speedoflight/1e6 )
 
