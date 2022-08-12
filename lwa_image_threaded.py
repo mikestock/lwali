@@ -313,7 +313,7 @@ if __name__ == '__main__':
     else:
         print ('Initializing Output')
         outputFile = h5py.File( settings.dirtypath, mode='w' )
-        outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32', compression='gzip')
+        outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
         #store settings information in here
         outputFile.attrs['samplerate']  = settings.samplerate
         outputFile.attrs['bandwidth']   = settings.bandwidth
