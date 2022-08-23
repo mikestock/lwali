@@ -57,7 +57,7 @@ def centroid( im, sigma=None ):
 
     return i_bar, j_bar, resid
 
-def quadmax( im, sigma,xx,yy ):
+def quadmax( im, sigma_x,sigma_y,xx,yy ):
     #sigma in pixels
     i,j = np.unravel_index( im.argmax(), im.shape )
     brightness = im[i,j]
@@ -80,7 +80,7 @@ def quadmax( im, sigma,xx,yy ):
     #find the max of the fit, done by setting the dirivative to 0
     i_ = -p[1]/p[0]/2
 
-    if not i_ > 0:
+    if i_ < ii-1 or i_ > ii+1:
         print ('wtf, polyfit borked' )
         return None,None,None,None
     #last step is to evaluate the parabolic fit to get the max brightness
@@ -98,13 +98,14 @@ def quadmax( im, sigma,xx,yy ):
     p = np.polyfit( x[m], y[m], 2 )
     j_ = -p[1]/p[0]/2
 
-    if not j_ > 0:
+    if j_ < jj-1 or j_ > jj+1:
         print ('wtf, polyfit borked' )
+        return None,None,None,None
     #last step is to evaluate the parabolic fit to get the max brightness
     aj = p[0]*j_**2 + p[1]*j_ + p[2]  
     
     # x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
-    peak = im.max() * np.exp( - ( (xx-j)**2 + (yy-i)**2 )/(2*sigma**2) )
+    peak = im.max() * np.exp( -(xx-j)**2/(2*sigma_x**2) -(yy-i)**2//(2*sigma_y**2) )
 
     return i_,j_, brightness, im-peak
 
@@ -156,13 +157,15 @@ if __name__ == '__main__':
                 maxFrequency = f
     #this will be in image plane units
     #nominal array diameter is 100 meters
-    sigma = settings.speedoflight/maxFrequency / 111
+    sigma_x = settings.speedoflight/maxFrequency / 111
+    sigma_y = settings.speedoflight/maxFrequency / 89
 
     #convert to pixels
     dca = (frames.attrs['bbox'][0][1]-frames.attrs['bbox'][0][0])/frames.attrs['imagesize']
-    print ( 'sigma',sigma, dca )
-    sigma /= dca
-    print ( 'sigma',sigma )
+    print ( 'sigma',sigma_x,sigma_y, dca )
+    sigma_x /= dca
+    sigma_y /= dca
+    print ( 'sigma',sigma_x,sigma_y )
 
     # sigma = 12
 
@@ -191,7 +194,7 @@ if __name__ == '__main__':
         skipCount = 0
 
         im = frame.copy()   #we copy the frame so we can remove stuff from it
-        thresh = 5*np.std(  im )
+        thresh = 6*np.std(  im )
         brightness = 0
         x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
 
@@ -203,7 +206,7 @@ if __name__ == '__main__':
         while iCentroids < 10 and im.max() > frame.max()/30:
             iCentroids += 1
 
-            i,j,brightness, im = quadmax( im, sigma, x, y )
+            i,j,brightness, im = quadmax( im, sigma_x,sigma_y, x, y )
             #did we get a solution?
             if i is None: break
 
@@ -211,7 +214,7 @@ if __name__ == '__main__':
             r = np.std(im)
             print( '%6i, %6i, %6i, %3.1f'% (iFrame, frame.max(), brightness, brightness/r) )
             #is the result still in specification?
-            if brightness < 7*r: break
+            if brightness < 3*r: break
 
             #convert to cosine projection
             ca,cb = index2cosab( i,j, frames )
@@ -222,14 +225,10 @@ if __name__ == '__main__':
             
             if cb > cbmax:
                 cbmax = cb
-            centroids.append( [tSample, ca, cb, brightness, r] )
+            centroids.append( [tSample, ca, cb, brightness, r, iCentroids] )
 
-            #remove this centroid from the image
-            peak = im.max() * np.exp( - ( (x-j)**2 + (y-i)**2 )/(2*sigma**2) )
-            im -= peak
-
-        if cbmax > .440:
-            sys.exit()
+        # if cbmax > .440:
+        #     sys.exit()
         # if iCentroids > 3:
         #     print ('%i, %i'%(iSample,iCentroids))
         # if tSample > 14.0014648 and brightness == 0:
@@ -261,6 +260,7 @@ if __name__ == '__main__':
         
 
         if iFrame%1000 == 0 and len(centroids) > 0:
+            if brightness is None: brightness = 0
             print ( '%1.7f %10i'%(tSample, brightness) )
             plt.cla()
             d = np.array( centroids )
@@ -271,19 +271,19 @@ if __name__ == '__main__':
 
         iFrame += 1
 
-    # ###
-    # # initialize the output
-    # # this overwrites the output file
-    # outputFile = h5py.File( settings.centroidpath, mode='w' )
-    # outputDset = outputFile.create_dataset( 'centroids', data=np.array(centroids), dtype='float32')
+    ###
+    # initialize the output
+    # this overwrites the output file
+    outputFile = h5py.File( settings.centroidpath, mode='w' )
+    outputDset = outputFile.create_dataset( 'centroids', data=np.array(centroids), dtype='float32')
 
-    # #copy over the attributes from the dirty file to the centroid file
-    # for k in inputFile.attrs.keys():
-    #     v = inputFile.attrs[k]
-    #     outputFile.attrs[k] = v
-    # for k in frames.attrs.keys():
-    #     v = frames.attrs[k]
-    #     outputDset.attrs[k] = v
+    #copy over the attributes from the dirty file to the centroid file
+    for k in inputFile.attrs.keys():
+        v = inputFile.attrs[k]
+        outputFile.attrs[k] = v
+    for k in frames.attrs.keys():
+        v = frames.attrs[k]
+        outputDset.attrs[k] = v
 
-    # outputFile.close()
+    outputFile.close()
 
