@@ -44,6 +44,16 @@ if __name__ == '__main__':
     inputFile = h5py.File( settings.centroidpath, 'r' )
     centroids = inputFile['centroids']
 
+    #remove things we're not supposed to render
+    sTime = centroids[:,0]*1e-3*settings.samplerate
+    if settings.renderer['startrender'] > 0:
+        m = sTime > settings.renderer['startrender']
+    else:
+        m = np.ones( len(centroids), dtype='bool')
+    if settings.renderer['stoprender'] > 0:
+        m&= sTime < settings.renderer['stoprender']
+    centroids = centroids[:][m]
+
     fig = plt.figure( figsize=settings.renderer['figsize'] )
     fig.subplots_adjust( top=1,bottom=0, right=1, left=0 )
 
@@ -63,6 +73,24 @@ if __name__ == '__main__':
         y = [np.sin(az), np.sin(az+np.pi)]
         plt.plot( x,y, txtcolor+'-', alpha=0.2, lw=1 )
 
-    im = np.histogram2d( centroids[:,1], centroids[:,2], weights=centroids[:,3], bins=1000, range=[[-1,1],[-1,1]] )
-    plt.imshow( im[0].T**.25, origin='lower', extent=[-1,1,-1,1], vmin=0, cmap=cmap  )
+
+    bgPixels  = settings.renderer['centroidresolution']
+    spPixels  = settings.renderer['sparkleres']
+    bbox = settings.renderer['bbox']
+
+    dx = bbox[0][1]-bbox[0][0]
+    dy = bbox[1][1]-bbox[1][0]
+    if dx > dy:
+        bgPixelsX = bgPixels
+        spPixelsX = spPixels
+        bgPixelsY = int( bgPixels*dy/dx )
+        spPixelsY = int( spPixels*dy/dx )
+    else:
+        bgPixelsY = bgPixels
+        spPixelsY = spPixels
+        bgPixelsX = int( bgPixels*dx/dy )
+        spPixelsX = int( spPixels*dx/dy )
+
+    im = np.histogram2d( centroids[:,1], centroids[:,2], weights=centroids[:,3], bins=[bgPixelsX,bgPixelsY], range=bbox )
+    plt.imshow( im[0].T**.25, origin='lower', extent=bbox.flatten(), vmin=0, cmap=cmap  )
     plt.pause(.1 )
