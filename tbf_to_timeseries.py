@@ -1,7 +1,7 @@
 from lsl.common import stations
 from lsl.reader import tbf, errors
 import numpy as np
-import h5py, sys, argparse
+import h5py, sys, argparse, os
 
 # import matplotlib.pyplot as plt
 
@@ -34,9 +34,11 @@ if __name__ == '__main__' :
                         help='where to store the output')
 
     args = parser.parse_args()
-    # main( args )
-# def main( args ):
-    outputFile = h5py.File( args.output_path, 'w' )
+
+    if os.path.exists( args.output_path ) and resume:
+        outputFile = h5py.File( args.output_path, 'a')
+    else:
+        outputFile = h5py.File( args.output_path, 'w' )
 
     #store combined spectrum stuff here
     for iStand in range(256):
