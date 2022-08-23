@@ -17,7 +17,8 @@ antennas = station.antennas #this is a list of antenna objects
 totalChannels  = 4096
 frequencyRange = 40000,88000    #this is really only used for calculating cable delays
 speedOfLight   = 299792458.0
-
+specTimeStart  = 0              #only use this if there are issues with continuity in the file
+resume         = True           #don't compute waveform if it's already in output file
 
 
 if __name__ == '__main__' :
@@ -40,7 +41,13 @@ if __name__ == '__main__' :
     #store combined spectrum stuff here
     for iStand in range(256):
         for iPol in range(2):
-            print( 'Reading data for Stand %i Pol %i'%(iStand+1, iPol))
+            
+            standKey = '%i_%i'%(iStand+1,iPol)
+            if resume and standKey in outputFile:
+                print( 'Data for Stand %i Pol %i already in output'%(iStand+1, iPol))
+                continue
+            else:
+                print( 'Reading data for Stand %i Pol %i'%(iStand+1, iPol))
             #loop over (unordered) list of files
             combinedSpec = {}
             triggerTime  = 0
@@ -80,6 +87,10 @@ if __name__ == '__main__' :
 
                         # specTime = cFrame.time.unix
                         specTime = int(cFrame.time.unix*1000000000)    #in ns since 1970
+                        if specTime < specTimeStart:
+                            #skip
+                            print( 'invalid specTime' )
+                            continue
                         if specTime < triggerTime or triggerTime == 0:
                             triggerTime = specTime
                         if not specTime in combinedSpec:
@@ -116,7 +127,7 @@ if __name__ == '__main__' :
             for specTime in sorted( combinedSpec.keys() ):
                 expectedTime = iChunk*samplePeriod*2*totalChannels
                 if abs(specTime-triggerTime- expectedTime ) > 500:
-                    print( 'ERROR timing tracking out os sync!!' )
+                    print( 'ERROR timing tracking out of sync!!' )
                     sys.exit(1)
 
                 timeSeries[ iTimeSeries:iTimeSeries+2*totalChannels ] = np.fft.irfft( combinedSpec[specTime] )
@@ -158,7 +169,7 @@ if __name__ == '__main__' :
             timeSeries = ( timeSeries/sampleGain ).astype( 'int16' )
 
             print ('Writing to hdf file' )
-            dset = outputFile.create_dataset( '%i_%i'%(iStand+1,iPol), data=timeSeries, dtype='int16', chunks=(8000,), compression="gzip")
+            dset = outputFile.create_dataset( standKey, data=timeSeries, dtype='int16', chunks=(8000,), compression="gzip")
             dset.attrs['stand'] = iStand+1
             dset.attrs['pol'] = iPol
             dset.attrs['integerCableDelay'] = integerCableDelay
