@@ -53,7 +53,7 @@ class Processor( Thread) :
             for i in range(10):
                 if len( self.queue ) == 0: 
                     break
-                iFrame, xcs = self.queue.pop(0)
+                iFrame, xcs, spec = self.queue.pop(0)
                 #is this frame already processed?
                 if settings.resume:
                     S =abs(hdfFile['dirty'][iFrame]).sum() 
@@ -63,6 +63,9 @@ class Processor( Thread) :
                         continue
                 im = self.image( xcs )
                 hdfFile['dirty'][iFrame] = im
+                if spec is not None:
+                    hdfFile['spec'][iFrame] = spec
+                del spec
             print ('closing')
             hdfFile.close()
     
@@ -72,8 +75,8 @@ class Processor( Thread) :
             bbox=self.settings.bbox, C=self.settings.speedoflight/1e6 )
         return im
 
-    def add( self, iFrame, xcs ):
-        self.queue.append ( (iFrame, xcs) )
+    def add( self, iFrame, xcs, spec=None ):
+        self.queue.append ( (iFrame, xcs, spec) )
 
 def read_config( configPath=CONFIG_PATH ):
     conf = configparser.ConfigParser()
@@ -323,23 +326,22 @@ if __name__ == '__main__':
         outputFile.attrs['steptime']    = settings.steptime
         outputFile.attrs['interpolation'] = settings.interpolation
         outputFile.attrs['whiten']      = settings.whiten
-        ###
-        # If the number of stands is too big, these guys won't actually fit in an attribute
-        # TODO - fix this
-        if len( loc ) < 32:
-            outputFile.attrs['stands']      = settings.antennas['stands']
-            outputFile.attrs['standlocs']   = loc
-            outputFile.attrs['ang']         = ang
-            outputFile.attrs['bls']         = bls
-            outputFile.attrs['dls']         = dls
+
+        # if we're imaging with lots of antennas, some of these arrays get too big to fit in attrs
+        # so we'll store them here instead
+        outputFile.create_dataset( 'stands', data=settings.antennas['stands'] )
+        outputFile.create_dataset( 'standlocs', data=loc )
+        outputFile.create_dataset( 'ang', data=ang )
+        outputFile.create_dataset( 'bls', data=bls )
+        outputFile.create_dataset( 'dls', data=dls )
 
         #these are about the actual resultant image
         outputDset.attrs['imagesize']   = settings.imagesize
         outputDset.attrs['bbox']        = settings.bbox
-        # specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
+        specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
     # output = np.memmap( settings.outputpath, mode='w+',  dtype='float32', shape=(NFrames,NImage,NImage) )
     # how big is the output? (hint, big)
-    s = NFrames*NImage*NImage*2/1024/1024
+    s = NFrames*NImage*NImage*4/1024/1024 + NFrames+2*I*4/1024/1024
     print ('Creating %s, sized %i MB'%(settings.dirtypath, s) )
 
     ######
@@ -407,6 +409,7 @@ if __name__ == '__main__':
             ffts[i] = ffti
         
         # spec = abs( ffts ).mean( axis=0 )
+        spec = None
 
 
         # loop over antenna pairs
@@ -436,7 +439,7 @@ if __name__ == '__main__':
 
         while len( processor.queue ) > 10:
             time.sleep( 0.1 )
-        processor.add( iFrame, xcs)
+        processor.add( iFrame, xcs, spec)
 
         ###
         # Save to Output
