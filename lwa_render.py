@@ -24,6 +24,28 @@ cdict = {
             'alpha': [(0,0,0),(1,1,1)]
 }
 cmap = LinearSegmentedColormap( 'cmap', segmentdata=cdict, N=256)
+
+###
+# create a colormap that goes blue, then while, then red
+cdict = { 
+            'red'  : [  (0.00,0.0,0.0),
+                        (0.45,0.2,0.2),
+                        (0.50,1.0,1.0),
+                        (0.55,1.0,1.0),
+                        (1.00,0.5,0.5)],
+            'green': [  (0.00,0.0,0.0),
+                        (0.45,0.2,0.2),
+                        (0.50,1.0,1.0),
+                        (0.55,0.2,0.2),
+                        (1.00,0.0,0.0)],
+            'blue' : [  (0.00,0.5,0.5),
+                        (0.45,1.0,1.0),
+                        (0.50,1.0,1.0),
+                        (0.55,0.2,0.2),
+                        (1.00,0.0,0.0)],
+}
+cmap_rwb = LinearSegmentedColormap( 'cmap', segmentdata=cdict, N=1024)
+
 txtcolor = 'k'  #sets the color of text, and line segments
 
 def clean( im, psf, iterations=10, factor=0.75 ):
@@ -206,10 +228,11 @@ if __name__ == '__main__':
                     interpolation='None', vmin=vmin, vmax=vmax, cmap='binary' )
             elif settings.renderer['deconvolution'].lower() == 'none':
                 #linearize the max
-                mx = np.exp( sparklemax ) -1
+                mx = sparklemax**4
                 print( im.max(), mx )
+                mx = im.max()
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
-                    interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
+                    interpolation='None', vmax=mx, vmin=-mx, cmap=cmap_rwb )
             elif settings.renderer['deconvolution'].lower() == 'dirty+':
                 im[im<im.max()/10] = 0
                 im = im **.5
