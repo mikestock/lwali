@@ -98,6 +98,27 @@ def read_config( configPath=CONFIG_PATH ):
                 val = range( 1,257 )
             # no nparrays for the antennas, these are just lists
             antennas[key] = val
+        #if gain and delay settings are here, go ahead and build out dicts for them
+        #these are in a list with the same ordering as the stands
+        #default gain is 1
+        if 'gains' in antennas:
+            gains = antennas['gains']
+        else:
+            gains = np.ones( len(antennas['stands']))
+        #default delay is 0
+        if 'delays' in antennas:
+            delays = antennas['delays']
+        else:
+            delays = np.zeros( len(antennas['stands']))
+        #now put the gains and delays into a dict
+        antennas['gains'] = {}
+        antennas['delays'] = {}
+        for i in range( len(antennas['stands'])):
+            stand = antennas['stands'][i]
+            antennas['gains'][ stand ] = gains[i] 
+            antennas['delays'][ stand ] = delays[i] 
+        
+        #actually store the antenna settings in settings, seems like a good idea
         settings.antennas = antennas
 
     # return the settings object
@@ -217,6 +238,7 @@ if __name__ == '__main__':
         iX = timeSeriesDsets[i].attrs['x']
         iY = timeSeriesDsets[i].attrs['y']
         iZ = timeSeriesDsets[i].attrs['z']
+        iStand = timeSeriesDsets[i].attrs['stand']
         loc[i] = iX, iY, iZ 
 
         for j in range(i+1,M):
@@ -226,6 +248,7 @@ if __name__ == '__main__':
 
             jX = timeSeriesDsets[j].attrs['x']
             jY = timeSeriesDsets[j].attrs['y']
+            jStand = timeSeriesDsets[j].attrs['stand']
 
 
             D = np.sqrt( (iX-jX)**2 + (iY-jY)**2 )
@@ -248,7 +271,7 @@ if __name__ == '__main__':
             # We've already handled the cable delays in the tbf conversion step
             # but, we haven't handled the beam stearing part
             tau = ( intdelays[i] - intdelays[j] ) * ( timeSeriesDsets[j].attrs['samplePeriod'] )
-            dls[k] = -tau 
+            dls[k] = -tau +settings.antennas['delays'][iStand]-settings.antennas['delays'][jStand]
 
             k += 1
     
@@ -341,11 +364,11 @@ if __name__ == '__main__':
         for k in range( len( timeSeriesDsets) ):
             dset = timeSeriesDsets[k]
             offset = dset.attrs['integerCableDelay'] + intdelays[k]
-            #TODO - What is this factor of 1000 for?
-            sampleGain = dset.attrs['sampleGain']*1000
+            sampleGain = dset.attrs['sampleGain']
+            stand      = dset.attrs['stand']
             d = dset[ iSample+offset:iSample+offset+settings.inttime ]
             # don't forget to apply time weighting
-            data.append( d*Wt*sampleGain )
+            data.append( d*Wt*sampleGain*settings.antennas['gains'][stand] )
             amp = data[-1].max() - data[-1].min()
             if amp > dMax:
                 dMax = amp
