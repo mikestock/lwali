@@ -214,7 +214,7 @@ if __name__ == '__main__':
             r = np.std(im)
             print( '%6i, %6i, %6i, %3.1f'% (iFrame, frame.max(), brightness, brightness/r) )
             #is the result still in specification?
-            if brightness < 3*r: break
+            if brightness < 6*r: break
 
             #convert to cosine projection
             ca,cb = index2cosab( i,j, frames )

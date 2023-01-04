@@ -44,6 +44,13 @@ if __name__ == '__main__':
     inputFile = h5py.File( settings.centroidpath, 'r' )
     centroids = inputFile['centroids']
 
+    ###
+    # fix the speed of light issue seen in some early version of the imager
+    fixc = 1
+    if 'fixc' in settings.renderer:
+        if settings.renderer['fixc']:
+            fixc = 299792458./290798684
+
     #remove things we're not supposed to render
     sTime = centroids[:,0]*1e-3*settings.samplerate
     if settings.renderer['startrender'] > 0:
@@ -91,6 +98,6 @@ if __name__ == '__main__':
         bgPixelsX = int( bgPixels*dx/dy )
         spPixelsX = int( spPixels*dx/dy )
 
-    im = np.histogram2d( centroids[:,1], centroids[:,2], weights=centroids[:,3], bins=[bgPixelsX,bgPixelsY], range=bbox )
+    im = np.histogram2d( centroids[:,1]*fixc, centroids[:,2]*fixc, weights=centroids[:,3], bins=[bgPixelsX,bgPixelsY], range=bbox )
     plt.imshow( im[0].T**.25, origin='lower', extent=bbox.flatten(), vmin=0, cmap=cmap  )
     plt.pause(.1 )

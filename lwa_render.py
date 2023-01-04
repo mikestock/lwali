@@ -81,7 +81,14 @@ if __name__ == '__main__':
 
     # load the dirty image data   
     inputFile = h5py.File( settings.dirtypath, 'r' )
-    
+
+    ###
+    # fix the speed of light issue seen in some early version of the imager
+    fixc = 1
+    if 'fixc' in settings.renderer:
+        if settings.renderer['fixc']:
+            fixc = 299792458./290798684
+
     frames = inputFile[ 'dirty' ]
     print ('loaded file has shape: %s'%repr( frames.shape ) )
     #override settings we loaded from the config in perfernces for settings stored in the hdf5 file
@@ -231,7 +238,7 @@ if __name__ == '__main__':
                 mx = sparklemax**4
                 print( im.max(), mx )
                 mx = im.max()
-                ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
+                ret = plt.imshow( im.T, extent=settings.bbox.flatten()*fixc, origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap=cmap_rwb )
             elif settings.renderer['deconvolution'].lower() == 'dirty+':
                 im[im<im.max()/10] = 0
@@ -239,7 +246,7 @@ if __name__ == '__main__':
                 #linearize the max
                 mx = sparklemax
                 print( im.max(), mx )
-                ret = plt.imshow( im.T, extent=settings.bbox.flatten(), origin='lower', 
+                ret = plt.imshow( im.T, extent=settings.bbox.flatten()*fixc, origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
 
             # Sparkles
@@ -248,7 +255,7 @@ if __name__ == '__main__':
                 im = np.log( imSparkle +1 )
                 # imSparkle /= settings.renderer['sparklemax']
                 im[ im == 0 ] = np.nan
-                ret2 = plt.imshow( im.T , extent=settings.bbox.flatten(), origin='lower', 
+                ret2 = plt.imshow( im.T , extent=settings.bbox.flatten()*fixc, origin='lower', 
                     interpolation='None', vmin=vmin, vmax=sparklemax, cmap=settings.renderer['sparklecmap'] )
 
             #Centroids
@@ -256,7 +263,7 @@ if __name__ == '__main__':
                 tSample = iSample/settings.samplerate*1000    #in ms
                 if tSample-lastCentroid > 0.05:
                     m = centroids[:,0] < tSample 
-                    im2 = np.histogram2d( centroids[m,1], centroids[m,2], weights=centroids[m,3], bins=1000, range=[[-1,1],[-1,1]] )
+                    im2 = np.histogram2d( centroids[m,1]*fixc, centroids[m,2]*fixc, weights=centroids[m,3], bins=1000, range=[[-1,1],[-1,1]] )
                     lastCentroid = tSample
                 ret3 = plt.imshow( im2[0].T**.25, origin='lower', extent=[-1,1,-1,1], vmin=0, cmap=cmap  )
 
