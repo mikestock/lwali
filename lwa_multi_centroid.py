@@ -16,6 +16,7 @@ plt.ion()
 ####
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
+MAX_CENTROIDS_PER_IMAGE = 10
 
 def centroid( im, sigma=None ):
     im = im.copy()
@@ -203,7 +204,7 @@ if __name__ == '__main__':
         # i,j,r = centroid( frame, sigma=sigma )
         iCentroids = 0
         cbmax = 0
-        while iCentroids < 10 and im.max() > frame.max()/30:
+        while iCentroids < MAX_CENTROIDS_PER_IMAGE and im.max() > frame.max()/30:
             iCentroids += 1
 
             i,j,brightness, im = quadmax( im, sigma_x,sigma_y, x, y )
