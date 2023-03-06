@@ -117,9 +117,26 @@ def read_config( configPath=CONFIG_PATH ):
             stand = antennas['stands'][i]
             antennas['gains'][ stand ] = gains[i] 
             antennas['delays'][ stand ] = delays[i] 
-        
+
+        #special case, polarization
+        if 'polarity' in antennas:
+            # first, fix my old typo, for backwards compatibility
+            val = antennas['polarity']
+            antennas.remove( 'polarity' )
+            antennas['polarization'] = val
+        #polarization of 0 is XX, 1 is YY, 2 is XY, 3 is YX
+        #make these conform, and convert to tuples
+        if not 'polarization' in antennas:
+            antennas['polarization'] = 0,0
+        elif antennas['polarization'] == 0: antennas['polarization'] = 0,0
+        elif antennas['polarization'] == 1: antennas['polarization'] = 1,1
+        elif antennas['polarization'] == 2: antennas['polarization'] = 0,1
+        elif antennas['polarization'] == 3: antennas['polarization'] = 1,0
+
         #actually store the antenna settings in settings, seems like a good idea
         settings.antennas = antennas
+
+
 
     # return the settings object
     return settings
@@ -178,19 +195,20 @@ if __name__ == '__main__':
     # collect all the data to be processed
     timeSeriesDsets = []
     for stand in settings.antennas['stands']:
-        dsetKey = '%i_%i'%(stand, settings.antennas['polarity'])
+        dsetKeyX = '%i_%i'%(stand, 0)
+        dsetKeyY = '%i_%i'%(stand, 0)
         try:
-            timeSeriesDsets.append( inputFile[dsetKey] )
+            timeSeriesDsets.append( (inputFile[dsetKeyX],inputFile[dsetKeyY]) )
         except:
-            print( 'ERROR - could not access timeseries for stand %i, pol %i'%(stand,settings.antennas['polarity'] ))
+            print( 'ERROR - could not access timeseries for stand %i'%(stand ) )
             sys.exit(1)
 
 
     # where do we stop processing data?
     if settings.stopsample < 1:
         maxSample = 0
-        for dset in timeSeriesDsets:
-            N = dset.shape[0] - dset.attrs['integerCableDelay']
+        for dsetX,dsetY in timeSeriesDsets:
+            N = dsetX.shape[0] - dsetX.attrs['integerCableDelay']
             if N > maxSample:
                 maxSample = N
         settings.stopsample = maxSample
@@ -216,8 +234,8 @@ if __name__ == '__main__':
     for i in range( M ):
 
         #get the antenna locations        
-        X = timeSeriesDsets[i].attrs['x']
-        Y = timeSeriesDsets[i].attrs['y']
+        X = timeSeriesDsets[i][0].attrs['x']
+        Y = timeSeriesDsets[i][0].attrs['y']
 
         #calculate baseline
         B = X**2 + Y**2
@@ -227,7 +245,7 @@ if __name__ == '__main__':
         #calculate the delay to this antenna based on image center (in nanoseconds)
         tau = (A[0]*settings.imagecenter[0]+A[1]*settings.imagecenter[1])*B/(settings.speedoflight/1e9)
         #make this an integer number of samples
-        intTau = int( tau // timeSeriesDsets[i].attrs['samplePeriod'] )
+        intTau = int( tau // timeSeriesDsets[i][0].attrs['samplePeriod'] )
 
         intdelays[i] = -intTau
 
@@ -235,10 +253,10 @@ if __name__ == '__main__':
     k = 0   #location in the arrays above
     for i in range(M):
         
-        iX = timeSeriesDsets[i].attrs['x']
-        iY = timeSeriesDsets[i].attrs['y']
-        iZ = timeSeriesDsets[i].attrs['z']
-        iStand = timeSeriesDsets[i].attrs['stand']
+        iX = timeSeriesDsets[i][0].attrs['x']
+        iY = timeSeriesDsets[i][0].attrs['y']
+        iZ = timeSeriesDsets[i][0].attrs['z']
+        iStand = timeSeriesDsets[i][0].attrs['stand']
         loc[i] = iX, iY, iZ 
 
         for j in range(i+1,M):
@@ -246,9 +264,9 @@ if __name__ == '__main__':
             if i==j:
                 continue
 
-            jX = timeSeriesDsets[j].attrs['x']
-            jY = timeSeriesDsets[j].attrs['y']
-            jStand = timeSeriesDsets[j].attrs['stand']
+            jX = timeSeriesDsets[j][0].attrs['x']
+            jY = timeSeriesDsets[j][0].attrs['y']
+            jStand = timeSeriesDsets[j][0].attrs['stand']
 
 
             D = np.sqrt( (iX-jX)**2 + (iY-jY)**2 )
@@ -270,7 +288,7 @@ if __name__ == '__main__':
             # what's the delay difference
             # We've already handled the cable delays in the tbf conversion step
             # but, we haven't handled the beam stearing part
-            tau = ( intdelays[i] - intdelays[j] ) * ( timeSeriesDsets[j].attrs['samplePeriod'] )
+            tau = ( intdelays[i] - intdelays[j] ) * ( timeSeriesDsets[j][0].attrs['samplePeriod'] )
             dls[k] = -tau +settings.antennas['delays'][iStand]-settings.antennas['delays'][jStand]
 
             k += 1
@@ -319,6 +337,7 @@ if __name__ == '__main__':
         outputFile.attrs['steptime']    = settings.steptime
         outputFile.attrs['interpolation'] = settings.interpolation
         outputFile.attrs['whiten']      = settings.whiten
+        outputFile.attrs['polarization']= settings.antennas['polarization']
         ###
         # If the number of stands is too big, these guys won't actually fit in an attribute
         # TODO - fix this
@@ -362,36 +381,41 @@ if __name__ == '__main__':
         data = []
         dMax = 0
         for k in range( len( timeSeriesDsets) ):
-            dset = timeSeriesDsets[k]
-            offset = dset.attrs['integerCableDelay'] + intdelays[k]
-            sampleGain = dset.attrs['sampleGain']
-            stand      = dset.attrs['stand']
-            d = dset[ iSample+offset:iSample+offset+settings.inttime ]
+            #dset0 and dset1 might be the same dset
+            dset0 = timeSeriesDsets[k][ settings.antennas['polarization'][0] ]
+            dset1 = timeSeriesDsets[k][ settings.antennas['polarization'][1] ]
+            offset = dset0.attrs['integerCableDelay'] + intdelays[k]
+            sampleGain = dset0.attrs['sampleGain']
+            stand      = dset0.attrs['stand']
+            d0 = dset0[ iSample+offset:iSample+offset+settings.inttime ] * Wt*sampleGain*settings.antennas['gains'][stand]
+            d1 = dset1[ iSample+offset:iSample+offset+settings.inttime ] * Wt*sampleGain*settings.antennas['gains'][stand]
             # don't forget to apply time weighting
-            data.append( d*Wt*sampleGain*settings.antennas['gains'][stand] )
-            amp = data[-1].max() - data[-1].min()
+            data.append( [d0,d1] )
+            amp = data[-1][0].max() - data[-1][0].min()
             if amp > dMax:
                 dMax = amp
         
         ###
         # Correlate
         xcs  = np.zeros( [len(antennaPairs), I*P*2], dtype='float32' ) #store the xcross correlations in an array
-        ffts = np.zeros( (M,2*I), dtype='complex64' )
+        ffts = np.zeros( (M,2,2*I), dtype='complex64' )
 
         for i in range(M):
-            ffti = np.fft.fft( data[i], 2*I )
-            if settings.whiten:
-                # TODO - not clear that this will works, since some of the 
-                #        frequency bins (should) have 0 power in them.
-                #        There is evidence that turning on whitening breaks things
-                # what is the mean rms amplitude of the current spectra?
-                p = abs(ffti).sum().real
-                # normalize the FFT (whiten) with some scaling to keep 
-                # the image amplitude about the same
-                ffti = ffti/abs( ffti )*p/len(ffti)
-            ffts[i] = ffti
+            for j in range(2):
+                fftij = np.fft.fft( data[i][j], 2*I )
+                if settings.whiten:
+                    # TODO - not clear that this will works, since some of the 
+                    #        frequency bins (should) have 0 power in them.
+                    #        There is evidence that turning on whitening breaks things
+                    # what is the mean rms amplitude of the current spectra?
+                    p = abs(fftij).sum().real
+                    # normalize the FFT (whiten) with some scaling to keep 
+                    # the image amplitude about the same
+                    fftij = fftij/abs( fftij )*p/len(fftij)
+                ffts[i][j] = fftij
         
-        spec = abs( ffts ).mean( axis=0 )
+        #mean across stands and polarizations
+        spec = (abs( ffts ).mean( axis=0 )).mean(axis=0)
 
 
         # loop over antenna pairs
@@ -404,8 +428,9 @@ if __name__ == '__main__':
 
             # compute the cross correlation
             # fpad does the interpolation
+            # the [0] and [1] select the polarization of the signals.
             # we toss the imag part, which should just be rounding error
-            xcs[k] = np.fft.ifft( fpad( ffts[i]*W*ffts[j].conj(), P ) ).real
+            xcs[k] = np.fft.ifft( fpad( ffts[i][0]*W*ffts[j][1].conj(), P ) ).real
             k += 1
 
         ###

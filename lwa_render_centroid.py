@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     ###
     # fix the speed of light issue seen in some early version of the imager
-    fixc = 1
+    fixc = 0
     if 'fixc' in settings.renderer:
         if settings.renderer['fixc']:
             fixc = 299792458./290798684

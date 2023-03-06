@@ -126,16 +126,20 @@ if __name__ == '__main__' :
             iChunk = 0
             iTimeSeries = 0
             timeSeries  = np.zeros( [nSamples ], dtype='float32' )
+            clippedCount = 0
             for specTime in sorted( combinedSpec.keys() ):
                 expectedTime = iChunk*samplePeriod*2*totalChannels
                 if abs(specTime-triggerTime- expectedTime ) > 500:
                     print( 'ERROR timing tracking out of sync!!' )
                     sys.exit(1)
-
+                m = abs(combinedSpec[specTime]) >= 7
+                clippedCount += len( combinedSpec[specTime][m] )
                 timeSeries[ iTimeSeries:iTimeSeries+2*totalChannels ] = np.fft.irfft( combinedSpec[specTime] )
                 iChunk += 1
                 iTimeSeries += 2*totalChannels
-
+            sys.exit(1)
+            
+            print ( clippedCount / len(timeSeries) )
             #apply correction for cable delay and dispersion
             #start by finding the right antenna
             for ant in antennas:

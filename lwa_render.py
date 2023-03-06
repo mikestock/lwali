@@ -241,11 +241,12 @@ if __name__ == '__main__':
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten()*fixc, origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap=cmap_rwb )
             elif settings.renderer['deconvolution'].lower() == 'dirty+':
-                im[im<im.max()/10] = 0
+                # im[im<im.max()/10] = 0
+                im[im<0] = 0
                 im = im **.5
                 #linearize the max
                 mx = sparklemax
-                print( im.max(), mx )
+                print( 10*np.log10(frames[i].max()/5.692e-5/settings.inttime) ,im.max(), mx )
                 ret = plt.imshow( im.T, extent=settings.bbox.flatten()*fixc, origin='lower', 
                     interpolation='None', vmax=mx, vmin=-mx, cmap='seismic' )
 
