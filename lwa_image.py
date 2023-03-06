@@ -196,7 +196,7 @@ if __name__ == '__main__':
     timeSeriesDsets = []
     for stand in settings.antennas['stands']:
         dsetKeyX = '%i_%i'%(stand, 0)
-        dsetKeyY = '%i_%i'%(stand, 0)
+        dsetKeyY = '%i_%i'%(stand, 1)
         try:
             timeSeriesDsets.append( (inputFile[dsetKeyX],inputFile[dsetKeyY]) )
         except:
