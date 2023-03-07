@@ -322,12 +322,21 @@ if __name__ == '__main__':
 
         print ('Appending to Output')
         outputFile = h5py.File( settings.dirtypath, mode='a' )
-        outputDset = outputFile['dirty']
+        #even though this file has been run before, it may not have been done for this polarization
+        outputKey = 'dirty%i%i'%settings.antennas['polarization']
+        if outputKey in outputFile:
+            outputDset = outputFile[outputKey]
+        else:
+            outputDset = outputFile.create_dataset( outputKey, shape=(NFrames,NImage,NImage), dtype='float32')
+            outputDset.attrs['polarization']= settings.antennas['polarization']
+            outputDset.attrs['imagesize']   = settings.imagesize
+            outputDset.attrs['bbox']        = settings.bbox
         specDset   = outputFile['spec']
     else:
         print ('Initializing Output')
         outputFile = h5py.File( settings.dirtypath, mode='w' )
-        outputDset = outputFile.create_dataset( 'dirty', shape=(NFrames,NImage,NImage), dtype='float32')
+        outputKey = 'dirty%i%i'%settings.antennas['polarization']
+        outputDset = outputFile.create_dataset( outputKey, shape=(NFrames,NImage,NImage), dtype='float32')
         #store settings information in here
         outputFile.attrs['samplerate']  = settings.samplerate
         outputFile.attrs['bandwidth']   = settings.bandwidth
@@ -337,7 +346,6 @@ if __name__ == '__main__':
         outputFile.attrs['steptime']    = settings.steptime
         outputFile.attrs['interpolation'] = settings.interpolation
         outputFile.attrs['whiten']      = settings.whiten
-        outputFile.attrs['polarization']= settings.antennas['polarization']
         ###
         # If the number of stands is too big, these guys won't actually fit in an attribute
         # TODO - fix this
@@ -349,6 +357,7 @@ if __name__ == '__main__':
             outputFile.attrs['dls']         = dls
 
         #these are about the actual resultant image
+        outputDset.attrs['polarization']= settings.antennas['polarization']
         outputDset.attrs['imagesize']   = settings.imagesize
         outputDset.attrs['bbox']        = settings.bbox
         specDset = outputFile.create_dataset( 'spec', shape=(NFrames,2*I), dtype='float32')
@@ -371,7 +380,7 @@ if __name__ == '__main__':
 
     while iSample + settings.steptime < settings.stopsample:
         if settings.resume:
-            if outputDset[iFrame].max() > 0:
+            if abs(outputDset[iFrame]).max() > 0:
                 iFrame += 1
                 iSample += settings.steptime 
                 continue
@@ -450,7 +459,7 @@ if __name__ == '__main__':
         specDset[iFrame] = spec  
 
         # Some output printing, so that I know something is happening
-        print( '  %10i %1.6f %i %0.1f'%(iSample, iSample/settings.samplerate, dMax, im.max()/5))
+        print( '  %10i %1.4f %0.2f %0.3f'%(iSample, iSample/settings.samplerate*1000, dMax, im.max()/5))
 
         # increment counters,
         iFrame += 1
