@@ -137,7 +137,6 @@ if __name__ == '__main__' :
                 timeSeries[ iTimeSeries:iTimeSeries+2*totalChannels ] = np.fft.irfft( combinedSpec[specTime] )
                 iChunk += 1
                 iTimeSeries += 2*totalChannels
-            sys.exit(1)
             
             print ( clippedCount / len(timeSeries) )
             #apply correction for cable delay and dispersion
@@ -146,7 +145,7 @@ if __name__ == '__main__' :
                 if ant.stand.id-1 == iStand and ant.pol == iPol:
                     break
             if not (ant.stand.id-1 == iStand and ant.pol == iPol):
-                print( 'ERROR Count not find antenna for stand %i pol %i'%(iStand+1, iPol) )
+                print( 'ERROR Could not find antenna for stand %i pol %i'%(iStand+1, iPol) )
                 sys.exit(1)
 
             #TODO, confirm this isn't borked up here
