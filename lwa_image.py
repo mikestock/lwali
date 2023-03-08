@@ -428,6 +428,7 @@ if __name__ == '__main__':
 
 
         # loop over antenna pairs
+        # TODO - get this parallelized using a map
         k = 0   #location in xcs
         for i,j in antennaPairs:
 
