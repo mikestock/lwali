@@ -31,32 +31,6 @@ class Settings( object ):
         self.antennas = { 'stands': range(1,257), 'polarity':0 }
 
 
-# class DataWriter( Thread ):
-#     """
-#     This class is to allow asynchronous writing of data to disk, 
-#     since these writes can take a while, but don't really need 
-#     to happen right away
-
-#     Threading in python isn't the same as multiprocessing, but 
-#     it's good for things like this.
-#     """
-#     def __init__(self, dset):
-#         Thread.__init__(self)
-#         self.dset    = dset
-#         self.queue   = []
-#         self.running = True 
-    
-#     def run( self ):
-#         while True:
-#             if not self.running:
-#                 break
-
-#             while len( self.queue ) > 0:
-#                 iFrame, im = self.queue.pop()
-#                 self.dset[iFrame] = im
-            
-#             time.sleep( 0.1 )
-
 def read_config( configPath=CONFIG_PATH ):
     conf = configparser.ConfigParser()
     conf.read( configPath )
@@ -109,26 +83,6 @@ def read_config( configPath=CONFIG_PATH ):
                 antennas['calibration'][i] = [0,0,1,1]
             antennas['calibration'][i][1] += channel_1_offset
 
-        #if gain and delay settings are here, go ahead and build out dicts for them
-        #these are in a list with the same ordering as the stands
-        #default gain is 1
-        # if 'gains' in antennas:
-        #     gains = antennas['gains']
-        # else:
-        #     gains = np.ones( len(antennas['stands']))
-        # #default delay is 0
-        # if 'delays' in antennas:
-        #     delays = antennas['delays']
-        # else:
-        #     delays = np.zeros( len(antennas['stands']))
-        # #now put the gains and delays into a dict
-        # antennas['gains'] = {}
-        # antennas['delays'] = {}
-        # for i in range( len(antennas['stands'])):
-        #     stand = antennas['stands'][i]
-        #     antennas['gains'][ stand ] = gains[i] 
-        #     antennas['delays'][ stand ] = delays[i] 
-
         #special case, polarization
         if 'polarity' in antennas:
             # first, fix my old typo, for backwards compatibility
@@ -150,12 +104,8 @@ def read_config( configPath=CONFIG_PATH ):
                 if stand in antennas['stands']:
                     antennas['stands'].remove( stand )
 
-                    
-
         #actually store the antenna settings in settings, seems like a good idea
         settings.antennas = antennas
-
-
 
     # return the settings object
     return settings
@@ -476,13 +426,6 @@ if __name__ == '__main__':
         
         #mean across stands and polarizations
         spec /= ffts.shape[0]*2
-
-
-        # loop over antenna pairs
-        # now done with a map in parallel
-        # mpPool = Pool( )
-        # xcs = np.array( mpPool.map( correlate, antennaPairs ), dtype='f' )
-        # the old way to correlate
 
         k = 0   #location in xcs
         for i,j in antennaPairs:
