@@ -9,11 +9,11 @@ import configparser, ast    #both used to read the configuration
 import os, sys, time    #libraries I just tend to use
 # the imager is a C library that does the imaging
 import lwa_imager as imager
-from threading import Thread
 
 ####
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
+channel_1_offset = 0  #ns - This is the timedelay offset between the X and Y polarizations
 
 ########
 #do a lot of fancy stuff with the config, so that it's easy to change antenna configurations
@@ -30,31 +30,32 @@ class Settings( object ):
         #use all antennas, with X polarity
         self.antennas = { 'stands': range(1,257), 'polarity':0 }
 
-class DataWriter( Thread ):
-    """
-    This class is to allow asynchronous writing of data to disk, 
-    since these writes can take a while, but don't really need 
-    to happen right away
 
-    Threading in python isn't the same as multiprocessing, but 
-    it's good for things like this.
-    """
-    def __init__(self, dset):
-        Thread.__init__(self)
-        self.dset    = dset
-        self.queue   = []
-        self.running = True 
+# class DataWriter( Thread ):
+#     """
+#     This class is to allow asynchronous writing of data to disk, 
+#     since these writes can take a while, but don't really need 
+#     to happen right away
+
+#     Threading in python isn't the same as multiprocessing, but 
+#     it's good for things like this.
+#     """
+#     def __init__(self, dset):
+#         Thread.__init__(self)
+#         self.dset    = dset
+#         self.queue   = []
+#         self.running = True 
     
-    def run( self ):
-        while True:
-            if not self.running:
-                break
+#     def run( self ):
+#         while True:
+#             if not self.running:
+#                 break
 
-            while len( self.queue ) > 0:
-                iFrame, im = self.queue.pop()
-                self.dset[iFrame] = im
+#             while len( self.queue ) > 0:
+#                 iFrame, im = self.queue.pop()
+#                 self.dset[iFrame] = im
             
-            time.sleep( 0.1 )
+#             time.sleep( 0.1 )
 
 def read_config( configPath=CONFIG_PATH ):
     conf = configparser.ConfigParser()
@@ -98,25 +99,35 @@ def read_config( configPath=CONFIG_PATH ):
                 val = range( 1,257 )
             # no nparrays for the antennas, these are just lists
             antennas[key] = val
+        
+        if not 'calibration' in antennas:
+            antennas['calibration'] = {}
+        if antennas['calibration'] is None:
+            antennas['calibration'] = {}
+        for i in range( 1, 257 ):
+            if not i in antennas['calibration']:
+                antennas['calibration'][i] = [0,0,1,1]
+            antennas['calibration'][i][1] += channel_1_offset
+
         #if gain and delay settings are here, go ahead and build out dicts for them
         #these are in a list with the same ordering as the stands
         #default gain is 1
-        if 'gains' in antennas:
-            gains = antennas['gains']
-        else:
-            gains = np.ones( len(antennas['stands']))
-        #default delay is 0
-        if 'delays' in antennas:
-            delays = antennas['delays']
-        else:
-            delays = np.zeros( len(antennas['stands']))
-        #now put the gains and delays into a dict
-        antennas['gains'] = {}
-        antennas['delays'] = {}
-        for i in range( len(antennas['stands'])):
-            stand = antennas['stands'][i]
-            antennas['gains'][ stand ] = gains[i] 
-            antennas['delays'][ stand ] = delays[i] 
+        # if 'gains' in antennas:
+        #     gains = antennas['gains']
+        # else:
+        #     gains = np.ones( len(antennas['stands']))
+        # #default delay is 0
+        # if 'delays' in antennas:
+        #     delays = antennas['delays']
+        # else:
+        #     delays = np.zeros( len(antennas['stands']))
+        # #now put the gains and delays into a dict
+        # antennas['gains'] = {}
+        # antennas['delays'] = {}
+        # for i in range( len(antennas['stands'])):
+        #     stand = antennas['stands'][i]
+        #     antennas['gains'][ stand ] = gains[i] 
+        #     antennas['delays'][ stand ] = delays[i] 
 
         #special case, polarization
         if 'polarity' in antennas:
@@ -132,6 +143,14 @@ def read_config( configPath=CONFIG_PATH ):
         elif antennas['polarization'] == 1: antennas['polarization'] = 1,1
         elif antennas['polarization'] == 2: antennas['polarization'] = 0,1
         elif antennas['polarization'] == 3: antennas['polarization'] = 1,0
+
+        antennas['stands'] = list( antennas['stands'] )
+        if 'excludestands' in antennas:
+            for stand in antennas['excludestands']:
+                if stand in antennas['stands']:
+                    antennas['stands'].remove( stand )
+
+                    
 
         #actually store the antenna settings in settings, seems like a good idea
         settings.antennas = antennas
@@ -168,6 +187,15 @@ def fpad(X,M):
      
     return output
 
+def correlate( pair ):
+    """
+    This does the FFT correlation for 1 antenna pair (i,j)
+    The intent is to use this in a multiprocessing map, to get them 
+    all done at once
+    """
+    i,j = pair
+    return np.fft.ifft( ffts[i][0]*W*ffts[j][1].conj() ).real
+
 #########
 # This is the main function block.  Will only run if program called from command line
 #  (as opposed to imported)
@@ -184,7 +212,6 @@ if __name__ == '__main__':
     # read the config and get the settings
     settings = read_config(configPath=configPath)
 
-
     # we have an input file right?
     if not os.path.exists( settings.timeseriespath ):
         raise ValueError( "%s is not a valid input file"%settings.timeseriespath )
@@ -195,6 +222,8 @@ if __name__ == '__main__':
     # collect all the data to be processed
     timeSeriesDsets = []
     for stand in settings.antennas['stands']:
+        if stand in settings.antennas['excludestands']:
+            continue
         dsetKeyX = '%i_%i'%(stand, 0)
         dsetKeyY = '%i_%i'%(stand, 1)
         try:
@@ -215,7 +244,7 @@ if __name__ == '__main__':
 
     ######
     # Calculate some array parameters which won't change during the flash
-    print ('**** ****')
+    print ('**** ****\nPre-computing things')
     ###
     # Some shorthand
     I = settings.inttime        #number of samples per integration window
@@ -289,14 +318,16 @@ if __name__ == '__main__':
             # We've already handled the cable delays in the tbf conversion step
             # but, we haven't handled the beam stearing part
             tau = ( intdelays[i] - intdelays[j] ) * ( timeSeriesDsets[j][0].attrs['samplePeriod'] )
-            dls[k] = -tau +settings.antennas['delays'][iStand]-settings.antennas['delays'][jStand]
 
+            pol = settings.antennas['polarization']
+            dls[k] = -tau +settings.antennas['calibration'][iStand][pol[0]]-settings.antennas['calibration'][jStand][pol[1]]
             k += 1
     
     # Trim the imaging arrays
     ang = ang[:k]
     bls = bls[:k]
     dls = dls[:k]
+    antennaPairs = np.array( antennaPairs, dtype='i' )
 
     ###
     # time weighting, to weight solution towards the center of the window
@@ -323,20 +354,31 @@ if __name__ == '__main__':
         print ('Appending to Output')
         outputFile = h5py.File( settings.dirtypath, mode='a' )
         #even though this file has been run before, it may not have been done for this polarization
+        for i in range( 2 ):
+            for j in range(2 ):
+                outputKey = 'dirty%i%i'%(i,j)
+                if not outputKey in outputFile:
+                    print ('creating %s'%outputKey)
+                    outputDset = outputFile.create_dataset( outputKey, shape=(NFrames,NImage,NImage), dtype='float32')
+                    outputDset.attrs['polarization']= settings.antennas['polarization']
+                    outputDset.attrs['imagesize']   = settings.imagesize
+                    outputDset.attrs['bbox']        = settings.bbox
         outputKey = 'dirty%i%i'%settings.antennas['polarization']
-        if outputKey in outputFile:
-            outputDset = outputFile[outputKey]
-        else:
-            outputDset = outputFile.create_dataset( outputKey, shape=(NFrames,NImage,NImage), dtype='float32')
-            outputDset.attrs['polarization']= settings.antennas['polarization']
-            outputDset.attrs['imagesize']   = settings.imagesize
-            outputDset.attrs['bbox']        = settings.bbox
+        outputDset = outputFile[outputKey]
         specDset   = outputFile['spec']
     else:
         print ('Initializing Output')
         outputFile = h5py.File( settings.dirtypath, mode='w' )
+        for i in range( 2 ):
+            for j in range(2 ):
+                outputKey = 'dirty%i%i'%(i,j)
+                print ('creating %s'%outputKey)
+                outputDset = outputFile.create_dataset( outputKey, shape=(NFrames,NImage,NImage), dtype='float32')
+                outputDset.attrs['polarization']= settings.antennas['polarization']
+                outputDset.attrs['imagesize']   = settings.imagesize
+                outputDset.attrs['bbox']        = settings.bbox
         outputKey = 'dirty%i%i'%settings.antennas['polarization']
-        outputDset = outputFile.create_dataset( outputKey, shape=(NFrames,NImage,NImage), dtype='float32')
+        outputDset = outputFile[outputKey]
         #store settings information in here
         outputFile.attrs['samplerate']  = settings.samplerate
         outputFile.attrs['bandwidth']   = settings.bandwidth
@@ -378,13 +420,15 @@ if __name__ == '__main__':
             iSample += settings.steptime
             iFrame  += 1
 
+    tStart = time.time()
+    framesProcessed = 0
     while iSample + settings.steptime < settings.stopsample:
         if settings.resume:
             if abs(outputDset[iFrame]).max() > 0:
                 iFrame += 1
                 iSample += settings.steptime 
                 continue
-
+            
         ###
         # Get Data
         data = []
@@ -396,8 +440,13 @@ if __name__ == '__main__':
             offset = dset0.attrs['integerCableDelay'] + intdelays[k]
             sampleGain = dset0.attrs['sampleGain']
             stand      = dset0.attrs['stand']
-            d0 = dset0[ iSample+offset:iSample+offset+settings.inttime ] * Wt*sampleGain*settings.antennas['gains'][stand]
-            d1 = dset1[ iSample+offset:iSample+offset+settings.inttime ] * Wt*sampleGain*settings.antennas['gains'][stand]
+            d0 = dset0[ iSample+offset:iSample+offset+settings.inttime ] * Wt*sampleGain
+            d1 = dset1[ iSample+offset:iSample+offset+settings.inttime ] * Wt*sampleGain
+            ###
+            # apply calbration gain
+            pol = settings.antennas['polarization']
+            d0 *= settings.antennas['calibration'][stand][ pol[0]+2 ]
+            d1 *= settings.antennas['calibration'][stand][ pol[1]+2 ]
             # don't forget to apply time weighting
             data.append( [d0,d1] )
             amp = data[-1][0].max() - data[-1][0].min()
@@ -407,8 +456,9 @@ if __name__ == '__main__':
         ###
         # Correlate
         xcs  = np.zeros( [len(antennaPairs), I*P*2], dtype='float32' ) #store the xcross correlations in an array
-        ffts = np.zeros( (M,2,2*I), dtype='complex64' )
+        ffts = np.zeros( (M,2,2*I), dtype='complex128' )
 
+        spec = np.zeros( 2*I )
         for i in range(M):
             for j in range(2):
                 fftij = np.fft.fft( data[i][j], 2*I )
@@ -421,14 +471,19 @@ if __name__ == '__main__':
                     # normalize the FFT (whiten) with some scaling to keep 
                     # the image amplitude about the same
                     fftij = fftij/abs( fftij )*p/len(fftij)
+                spec += abs( fftij )
                 ffts[i][j] = fftij
         
         #mean across stands and polarizations
-        spec = (abs( ffts ).mean( axis=0 )).mean(axis=0)
+        spec /= ffts.shape[0]*2
 
 
         # loop over antenna pairs
-        # TODO - get this parallelized using a map
+        # now done with a map in parallel
+        # mpPool = Pool( )
+        # xcs = np.array( mpPool.map( correlate, antennaPairs ), dtype='f' )
+        # the old way to correlate
+
         k = 0   #location in xcs
         for i,j in antennaPairs:
 
@@ -441,6 +496,7 @@ if __name__ == '__main__':
             # the [0] and [1] select the polarization of the signals.
             # we toss the imag part, which should just be rounding error
             xcs[k] = np.fft.ifft( fpad( ffts[i][0]*W*ffts[j][1].conj(), P ) ).real
+            # xcs[k] = np.fft.ifft( ffts[i][0]*W*ffts[j][1].conj() ).real
             k += 1
 
         ###
@@ -460,7 +516,8 @@ if __name__ == '__main__':
         specDset[iFrame] = spec  
 
         # Some output printing, so that I know something is happening
-        print( '  %10i %1.4f %0.2f %0.3f'%(iSample, iSample/settings.samplerate*1000, dMax, im.max()/5))
+        framesProcessed += 1
+        print( '  %10i %1.4f %0.2f %6.3f %1.1f'%(iSample, iSample/settings.samplerate*1000, dMax, im.max()/5, (time.time()-tStart)/framesProcessed ))
 
         # increment counters,
         iFrame += 1
