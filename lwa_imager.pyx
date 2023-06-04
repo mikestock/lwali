@@ -5,6 +5,12 @@ import numpy as np
 from libc.math cimport sin, cos, M_PI, sqrt
 from libc.stdlib cimport malloc, free
 from cython.parallel import prange
+cimport openmp
+
+# cdef extern from "<complex.h>" namespace "std" nogil:
+cdef extern from "complex.h" nogil:
+    float crealf( double complex )
+    double complex conj( double complex )
 
 # cdef float quadint( float a1, float a2, float a3, float i ) nogil:
 #     """
@@ -99,6 +105,25 @@ cdef float quadint( float[:,:] arr, int k, float i ):
 
     return Output	
 
+def correlate( int[:,:] antennaPairs, 
+               double complex[:,:,:] ffts, 
+               float[:] W,
+               float[:,:] xcs
+               ):
+    """
+    A parallel capable implementation of the correlation step
+    Generates the xc (cross correlation) array in place
+    """
+    cdef int k, i, j, N, M, l
+    N = len( antennaPairs )
+    M = ffts.shape[-1]
+    for k in prange( N, nogil=True ):
+        i = antennaPairs[k][0]
+        j = antennaPairs[k][1]
+        for l in range( M ):
+            xcs[k][l] = crealf( ffts[i][0][l] *W[l] * conj( ffts[j][1][l] ) )
+        # xcs[k] = np.fft.ifft( fpad( ffts[i][0] *W *np.conjugate(ffts[j][1]), P ) ).real
+
 def pimage( float[:,:] xc, 
             float[:] bl, 
             float[:] dl,
@@ -162,6 +187,8 @@ def pimage( float[:,:] xc,
     cdef float pixelValue
     cdef np.ndarray[float, ndim=2] Output = np.zeros( (N,N), dtype='float32' )
     
+    cdef int num_threads = openmp.omp_get_num_threads()
+
     ###
     # Loop through the pixel
     for i in prange(N, nogil=True):
