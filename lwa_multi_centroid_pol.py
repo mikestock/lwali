@@ -17,6 +17,7 @@ plt.ion()
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
 MAX_CENTROIDS_PER_IMAGE = 10
+STD_THRESH = 6
 
 def centroid( im, sigma=None ):
     im = im.copy()
@@ -203,7 +204,7 @@ if __name__ == '__main__':
         skipCount = 0
 
         im = I.copy()   #we copy the frame so we can remove stuff from it
-        thresh = 6*np.std(  im )
+        thresh = STD_THRESH*np.std(  im )
         brightness = 0
         x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
 
@@ -223,7 +224,7 @@ if __name__ == '__main__':
             r = np.std(im)
             print( '%6i, %6i, %6i, %3.1f'% (iFrame, I.max(), brightness, brightness/r) )
             #is the result still in specification?
-            if brightness < 6*r: break
+            if brightness < STD_THRESH*r: break
 
             #convert to cosine projection
             ca,cb = index2cosab( i,j, frames[0] )
