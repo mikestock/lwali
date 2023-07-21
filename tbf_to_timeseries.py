@@ -18,8 +18,8 @@ totalChannels  = 4096
 frequencyRange = 40000,88000    #this is really only used for calculating cable delays
 speedOfLight   = 299792458.0
 specTimeStart  = 0              #only use this if there are issues with continuity in the file
-resume         = True           #don't compute waveform if it's already in output file
-
+resume         = False           #don't compute waveform if it's already in output file
+skipSaturated  = True
 
 if __name__ == '__main__' :
     #parse the command line
@@ -116,6 +116,14 @@ if __name__ == '__main__' :
                 if channelCount[k] > countMax: countMax = channelCount[k]
                 if channelCount[k] < countMin: countMin = channelCount[k]
             print( 'Data read from %i/%i total frequency channels'%(countMin,countMax))
+
+            #remove contributions from saturated samples?
+            if skipSaturated:
+                print( 'Masking out saturated samples' )
+                for specTime in combinedSpec:
+                    m = abs(combinedSpec[specTime]) >=9.89  #this is 7 for imag and real
+                    combinedSpec[specTime][m] *= 0
+
             #convert to timeseries
             print( 'Spliting frames into continuous time series')
             nSamples = len( combinedSpec ) * totalChannels*2   #we'll have this many samples in each one
@@ -153,8 +161,8 @@ if __name__ == '__main__' :
             N = int(len(timeSeries)/2+1)
             freq = np.linspace( 0, totalChannels*25000, N )
             m = (freq>frequencyRange[0]*1000)&(freq<frequencyRange[1]*1000)
-            #this is the cable delay, measured in sampled
-            delay = ant.cable.delay( freq[m] )*1e9/samplePeriod  
+            #this is the cable delay, measured in samples
+            delay = (ant.cable.delay( freq[m] ) -ant.stand.z/speedOfLight)*1e9/samplePeriod  
             #remove the smallest integer number of samples from this delay
             integerCableDelay = int( delay.min() )
             delay -= integerCableDelay

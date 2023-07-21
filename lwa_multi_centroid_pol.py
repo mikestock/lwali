@@ -16,7 +16,7 @@ plt.ion()
 ####
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
-MAX_CENTROIDS_PER_IMAGE = 10
+MAX_CENTROIDS_PER_IMAGE = 1
 STD_THRESH = 6
 
 def centroid( im, sigma=None ):
@@ -107,7 +107,7 @@ def quadmax( im, sigma_x,sigma_y,xx,yy ):
     aj = p[0]*j_**2 + p[1]*j_ + p[2]  
     
     # x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
-    peak = im.max() * np.exp( -(xx-j)**2/(2*sigma_x**2) -(yy-i)**2//(2*sigma_y**2) )
+    peak = im.max() * np.exp( -(xx-j)**2/(2*sigma_x**2) -(yy-i)**2/(2*sigma_y**2) )
 
     return i_,j_, brightness, im-peak
 

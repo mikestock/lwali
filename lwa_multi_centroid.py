@@ -106,7 +106,7 @@ def quadmax( im, sigma_x,sigma_y,xx,yy ):
     aj = p[0]*j_**2 + p[1]*j_ + p[2]  
     
     # x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
-    peak = im.max() * np.exp( -(xx-j)**2/(2*sigma_x**2) -(yy-i)**2//(2*sigma_y**2) )
+    peak = im.max() * np.exp( -(xx-j)**2/(2*sigma_x**2) -(yy-i)**2/(2*sigma_y**2) )
 
     return i_,j_, brightness, im-peak
 
@@ -134,7 +134,10 @@ if __name__ == '__main__':
     # load the dirty image data   
     inputFile = h5py.File( settings.dirtypath, 'r' )
 
-    frames = inputFile[ 'dirty' ]
+    if 'dirty' in inputFile.keys():
+        frames = inputFile[ 'dirty' ]
+    else:
+        frames = inputFile[ 'dirty00' ]
     print ('loaded file has shape: %s'%repr( frames.shape ) )
     #override settings we loaded from the config in perfernces for settings stored in the hdf5 file
     for key in inputFile.attrs.keys():
@@ -158,8 +161,8 @@ if __name__ == '__main__':
                 maxFrequency = f
     #this will be in image plane units
     #nominal array diameter is 100 meters
-    sigma_x = settings.speedoflight/maxFrequency / 111
-    sigma_y = settings.speedoflight/maxFrequency / 89
+    sigma_x = settings.speedoflight/maxFrequency / 111 #/1.141
+    sigma_y = settings.speedoflight/maxFrequency / 89 #/1.141
 
     #convert to pixels
     dca = (frames.attrs['bbox'][0][1]-frames.attrs['bbox'][0][0])/frames.attrs['imagesize']
