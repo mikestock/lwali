@@ -130,6 +130,10 @@ if __name__ == '__main__':
 
     # load the configuration
     settings = lwai.read_config(configPath)
+    
+    if hasattr( settings, 'maxcentroidsperimage' ):
+        print( 'using %i has max centroids per image'%settings.maxcentroidsperimage )
+        MAX_CENTROIDS_PER_IMAGE = settings.maxcentroidsperimage
 
     # load the dirty image data   
     inputFile = h5py.File( settings.dirtypath, 'r' )

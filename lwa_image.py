@@ -21,14 +21,64 @@ class Settings( object ):
     """a class to store settings information
     """
     def __init__(self):
-        # set some not so crazy defaults
-        self.samplerate = 200000000.
-        self.bandwidth  = [30000000,80000000]
-        self.timeseriespath  = None
-        self.startsample= 0
 
-        #use all antennas, with X polarity
-        self.antennas = { 'stands': range(1,257), 'polarity':0 }
+        ###
+        # set some not so crazy defaults
+        # Paths
+        self.timeseriespath  = None
+        self.dirtypath       = None
+        self.centroidpath    = None
+        self.resume          = False
+        #physical constants
+        self.samplerate   = 204800000.
+        self.speedoflight = 290798684
+        self.bandwidth    = [[30000000,80000000]]
+        #imaging constraints
+        self.startsample  = 0
+        self.stopsample   = -1
+        self.resumesample = 0
+        self.inttime      = 200
+        self.steptime     = 2000
+        self.interpolation= 2
+        self.imagesize    = 301
+        self.imagecenter  = (0,0)
+        self.bbox         = [[-1.1,1.1],[-1.1,1.1]]
+        self.azel         = False
+        self.whiten       = False
+        self.minbaseline  = 1
+        self.maxbaseline  = 1000
+        #deconvolution
+        self.maxcentroidsperimage = 10
+
+        #antennas
+        self.antennas = {}
+        self.antennas['stands'] = [1, 210, 214, 73, 249, 18, 116, 113, 255, 6, 162, 74, 242, 28, 78, 160, 211, 24, 250, 76, 77, 209, 4, 241, 25, 163, 202, 14, 245, 30, 207, 20, 115, 240, 27, 29, 246, 111, 212, 5, 203, 72, 243, 161, 75, 251, 2, 112, 254, 79, 23, 164, 239, 13, 117, 208, 3, 159, 218, 26, 213, 69, 81, 253, 10, 71, 215, 31, 201, 110, 248, 34, 66, 247, 206, 119, 109, 9, 252, 33, 216, 70, 224, 12, 204, 80, 114, 165, 21, 238, 219, 157, 118, 7, 197, 120, 22, 223, 65, 235, 32, 237, 15, 228, 37, 107, 217, 205, 11, 168, 68, 82, 156, 232, 38, 236, 16, 166, 67, 35, 108, 122, 227, 61, 121, 200, 58, 231, 43, 220, 154, 221, 155, 42, 233, 49, 234, 83, 64, 167, 196, 104, 169, 39, 226, 52, 60, 194, 36, 199, 172, 48, 153, 41, 222, 106, 123, 152, 124, 63, 230, 57, 225, 198, 84, 229, 62, 103, 170, 47, 40, 190, 51, 175, 195, 59, 44, 125, 151, 56, 181, 193, 46, 105, 176, 127, 85, 185, 100, 101, 149, 129, 148, 173, 180, 53, 86, 189, 87, 192, 55, 126, 54, 150, 45, 191, 177, 50, 184, 128, 102, 99, 88, 146, 174, 188, 93, 186, 89, 147, 132, 187, 90, 98, 182, 178, 95, 130, 145, 143, 135, 92, 183, 144, 131, 97, 179, 140, 91, 133, 96, 142, 136, 139, 134, 141, 94, 138, 137]
+        self.antennas['excludestands'] = [256]
+        self.antennas['[polarization'] = 0
+
+        #renderer
+        self.renderer = {}
+        self.renderer['figsize']            = 6,4
+        self.renderer['figdpi']             = 100
+        self.renderer['bbox']               = [[-1,1],[-.44,.9]]
+        self.renderer['startrender']        = 0
+        self.renderer['stoprender']         = -1
+        self.renderer['frameintegration']   = 100
+        self.renderer['plotcentroids']      = True
+        self.renderer['centroidresolution'] = 500
+        self.renderer['videointegration']   = True
+        self.renderer['display']            = True
+        self.renderer['stepwise']           = False
+        self.renderer['sampletime']         = False
+        self.renderer['saveoutput']         = True
+        self.renderer['outputdir']          = 'frames/'
+        self.renderer['vmax']               = 5
+        self.renderer['vmin']               = 0
+        self.renderer['sparkle']            = True
+        self.renderer['sparklemax']         = .5
+        self.renderer['sparklepersist']     = .1
+        self.renderer['sparkleres']         = 250
+        self.renderer['sparklecmap']        = 'cool'
 
 
 def read_config( configPath=CONFIG_PATH ):
