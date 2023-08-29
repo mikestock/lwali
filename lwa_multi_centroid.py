@@ -17,6 +17,7 @@ plt.ion()
 # GLOBALS
 CONFIG_PATH = 'lwa_image.cfg'
 MAX_CENTROIDS_PER_IMAGE = 10
+CENTROID_SIGMA = 6
 
 def centroid( im, sigma=None ):
     im = im.copy()
@@ -134,6 +135,9 @@ if __name__ == '__main__':
     if hasattr( settings, 'maxcentroidsperimage' ):
         print( 'using %i has max centroids per image'%settings.maxcentroidsperimage )
         MAX_CENTROIDS_PER_IMAGE = settings.maxcentroidsperimage
+    if hasattr( settings, 'centroidsigma' ):
+        print( 'using %2.1f has centroid sigma criteria'%settings.centroidsigma )
+        CENTROID_SIGMA = settings.centroidsigma
 
     # load the dirty image data   
     inputFile = h5py.File( settings.dirtypath, 'r' )
@@ -202,7 +206,7 @@ if __name__ == '__main__':
         skipCount = 0
 
         im = frame.copy()   #we copy the frame so we can remove stuff from it
-        thresh = 6*np.std(  im )
+        thresh = CENTROID_SIGMA*np.std(  im )
         brightness = 0
         x,y = np.meshgrid( np.arange( im.shape[0]), np.arange(im.shape[1]) )
 
@@ -222,7 +226,7 @@ if __name__ == '__main__':
             r = np.std(im)
             print( '%6i, %6i, %6i, %3.1f'% (iFrame, frame.max(), brightness, brightness/r) )
             #is the result still in specification?
-            if brightness < 6*r: break
+            if brightness < CENTROID_SIGMA*r: break
 
             #convert to cosine projection
             ca,cb = index2cosab( i,j, frames )
