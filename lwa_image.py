@@ -389,6 +389,8 @@ if __name__ == '__main__':
         outputFile.attrs['steptime']    = settings.steptime
         outputFile.attrs['interpolation'] = settings.interpolation
         outputFile.attrs['whiten']      = settings.whiten
+        #Trigger Time - comes from the timeseries
+        outputFile.attrs['triggertime'] = timeSeriesDsets[0][0].attrs['triggerTime']    #why is this camelcase?
         ###
         # If the number of stands is too big, these guys won't actually fit in an attribute
         # TODO - fix this
